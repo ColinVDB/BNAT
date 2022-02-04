@@ -54,12 +54,46 @@ from tqdm.auto import tqdm
 
 
 def launch(parent):
+    """
+    
+
+    Parameters
+    ----------
+    parent : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
     window = MainWindow(parent)
     window.show()
+    
+    
 
+# =============================================================================
+# MainWindow
+# =============================================================================
 class MainWindow(QMainWindow):
+    """
+    """
+    
 
     def __init__(self, parent):
+        """
+        
+
+        Parameters
+        ----------
+        parent : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         super().__init__()
         self.parent = parent
         self.bids = self.parent.bids
@@ -75,15 +109,45 @@ class MainWindow(QMainWindow):
 
         self.window.setLayout(layout)
 
+
     def center(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         qr = self.frameGeometry()
         cp = QDesktopWidget().availableGeometry().center()
         qr.moveCenter(cp)
         self.move(qr.topLeft())
 
+
+
+# =============================================================================
+# FlairStarTab
+# =============================================================================
 class FlairStarTab(QWidget):
+    """
+    """
+    
 
     def __init__(self, parent):
+        """
+        
+
+        Parameters
+        ----------
+        parent : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         super().__init__()
         self.parent = parent
         self.bids = self.parent.bids
@@ -104,8 +168,17 @@ class FlairStarTab(QWidget):
         layout.addWidget(self.flairStar_button)
         
         self.setLayout(layout)
+        
 
     def flairStar_computation(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         subjects = self.subjects_input.text()
         sessions = self.sessions_input.text()
         self.subjects = []
@@ -175,22 +248,69 @@ class FlairStarTab(QWidget):
         
         self.parent.hide()
         
+        
     def end_pipeline(self, last):
+        """
+        
+
+        Parameters
+        ----------
+        last : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         if last:
             logging.info("rec-star_FLAIR Pipeline has finished working")
 
 
+
+# =============================================================================
+# FlairStarWorker
+# =============================================================================
 class FlairStarWorker(QObject):
+    """
+    """
     finished = pyqtSignal()
     progress = pyqtSignal(int)
+    
 
     def __init__(self, bids, sub, ses):
+        """
+        
+
+        Parameters
+        ----------
+        bids : TYPE
+            DESCRIPTION.
+        sub : TYPE
+            DESCRIPTION.
+        ses : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         super().__init__()
         self.bids = bids
         self.sub = sub
         self.ses = ses
         
+        
     def run(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         # Action
         derivative = 'rec-star_FLAIR'
         sub_ses_directory = pjoin(self.bids.root_dir, f'sub-{self.sub}', f'ses-{self.ses}', 'anat')

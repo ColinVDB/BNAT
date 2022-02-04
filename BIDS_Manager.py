@@ -67,8 +67,25 @@ from my_logging import setup_logging
 
 faulthandler.enable()
 
+
+
+# =============================================================================
+# MainWindow
+# =============================================================================
 class MainWindow(QMainWindow):
+    """
+    """
+    
+    
     def __init__(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         super().__init__()
         self.memory = {}
         try:
@@ -93,7 +110,6 @@ class MainWindow(QMainWindow):
                     attr = jsn.get('attr')
                     self.pipelines[jsn.get('name')] = jsn
                     self.pipelines[jsn.get('name')]['import'] = __import__(f'Pipelines.{import_name}', globals(), locals(), [attr], 0)
-                    # self.pipelines[jsn.get('name')]['launcher'] = self.pipelines[jsn.get('name')]['import'].
                     f.close()
 
         # Create menu bar and add action
@@ -106,16 +122,19 @@ class MainWindow(QMainWindow):
             self.PipelinesMenu.addAction(new_action)
         
         self.threads_pool = QThreadPool.globalInstance()
-        
-        
-        # self.sys_stdout = sys.stdout
-        # self.sys_stderr = sys.stderr
-        # sys.stdout = logging.info
-        # sys.stderr = logging.error
 
         self.init_ui()
 
+
     def init_ui(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         self.setWindowTitle('BIDS Manager')
         self.setWindowIcon(QIcon('bids_icon.png'))
         self.window = QWidget(self)
@@ -142,10 +161,6 @@ class MainWindow(QMainWindow):
 
         self.bids_actions = BidsActions(self)
 
-        # self.bids_dialog = BidsDialog(self)
-# =============================================================================
-#         New logging
-# =============================================================================
         setup_logging(self.__class__.__name__)
 
         self.__logger = logging.getLogger(self.__class__.__name__)
@@ -168,9 +183,6 @@ class MainWindow(QMainWindow):
         self.thread_std_out_queue_listener.started.connect(self.std_out_text_receiver.run)
         self.thread_std_out_queue_listener.finished.connect(self.thread_std_out_queue_listener.deleteLater)
         self.thread_std_out_queue_listener.start()
-# =============================================================================
-# 
-# =============================================================================
 
         validator = BIDSValidator()
         if not validator.is_bids(self.bids_dir):
@@ -187,43 +199,73 @@ class MainWindow(QMainWindow):
 
         self.center()
 
+
     def center(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         qr = self.frameGeometry()
         cp = QDesktopWidget().availableGeometry().center()
         qr.moveCenter(cp)
         self.move(qr.topLeft())
 
+
     def closeEvent(self, event):
-        # time.sleep(3)
+        """
+        
+
+        Parameters
+        ----------
+        event : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         memory_df = pd.DataFrame(self.memory, index=[0])
         memory_df.to_pickle('memory.xz')
-        # stopping listener
         logging.info('Stop Listener')
-        # output_redirection_tools.delete_config_dict(config_dict)
         self.std_out_text_receiver.deleteLater()
         self.std_out_text_receiver.stop()
         self.thread_std_out_queue_listener.quit()
         self.thread_std_out_queue_listener.wait()
+        
     
     def close(self):
-        # time.sleep(3)
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         memory_df = pd.DataFrame(self.memory, index=[0])
         memory_df.to_pickle('memory.xz')
-        # stopping listener
         logging.info('Stop Listener')
-        # output_redirection_tools.delete_config_dict(config_dict)
         self.std_out_text_receiver.deleteLater()
         self.std_out_text_receiver.stop()
         self.thread_std_out_queue_listener.quit()
         self.thread_std_out_queue_listener.wait()
+        
 
     def update_bids(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         logging.info("update_bids!")
-        # bids_dir_split = self.bids.root_dir.split('/')
-        # self.bids_name = bids_dir_split[len(bids_dir_split)-1]
-        # self.bids_lab.setText(self.bids_name)
-        # self.bids_metadata.update_metadata()
-        # self.bids_dir_view.update_dir()
 
         bids_dir = str(QFileDialog.getExistingDirectory(self, "Select BIDS Directory"))
         if os.path.isdir(bids_dir):
@@ -251,55 +293,48 @@ class MainWindow(QMainWindow):
             self.window.setLayout(layout)
         else:
             pass
+        
 
     def launch_pipeline(self, pipe):
+        """
+        
+
+        Parameters
+        ----------
+        pipe : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         self.pipelines[pipe]['import'].launch(self)
         
 
-# class OpeningWindow(QWidget):
-#     def __init__(self):
-#         super().__init__()
-#         self.init_ui()
 
-#     def init_ui(self):
-#         self.setWindowTitle('OpeningWindow')
-#         self.center()
-
-#         label = QLabel("Select or Create your BIDS Directory")
-
-#         button = QPushButton('Browse')
-#         button.clicked.connect(self.browse)
-
-#         layout = QVBoxLayout()
-#         layout.addWidget(label)
-#         layout.addWidget(button)
-
-#         self.setLayout(layout)
-
-#     def center(self):
-#         qr = self.frameGeometry()
-#         cp = QDesktopWidget().availableGeometry().center()
-#         qr.moveCenter(cp)
-#         self.move(cp)
-
-#     def browse(self):
-#         logging.info('Browse')
-#         self.folderpath = QFileDialog.getExistingDirectory(self, 'Select Folder')
-
-#         logging.info(self.folderpath)
-
-    # def closeEvent(self, event):
-    #     sys.stdout = self.sys_stdout
-    #     sys.stderr = self.sys_stderr
-
-    # def close(self):
-    #     sys.stdout = self.sys_stdout
-    #     sys.stderr = self.sys_stderr
-        
-
+# =============================================================================
+# BidsDirView
+# =============================================================================
 class BidsDirView(QWidget):
+    """
+    """
+    
 
     def __init__(self, parent):
+        """
+        
+
+        Parameters
+        ----------
+        parent : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         super().__init__()
         self.parent = parent
         self.bids = self.parent.bids
@@ -326,14 +361,37 @@ class BidsDirView(QWidget):
         layout = QVBoxLayout()
         layout.addWidget(self.tree)
         self.setLayout(layout)
+        
 
     def update_dir(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         self.model = QFileSystemModel()
         self.model.setRootPath(self.parent.bids_dir)
         self.tree.setModel(self.model)
         self.tree.setRootIndex(self.model.index(self.parent.bids_dir))
+        
 
     def treeMedia_doubleClicked(self, index):
+        """
+        
+
+        Parameters
+        ----------
+        index : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         item = self.tree.selectedIndexes()[0]
         item_path = item.model().filePath(index)
         if os.path.isfile(item_path):
@@ -344,9 +402,6 @@ class BidsDirView(QWidget):
                     logging.info(f'No application selected open MRI \n \t Please select itksnap path')
                 else:
                     print(self.itksnap)
-                    # subprocess.call([self.itksnap, '-g', f"{item_path}"])
-                    # operation = RunnableSubprocess(f'{self.itksnap} -g {item_path}')
-                    # self.parent.threads_pool.start(operation)
                     self.threads.append(QThread())
                     self.operation = SubprocessWorker(f'{self.itksnap} -g {item_path}')
                     self.operation.moveToThread(self.threads[-1])
@@ -357,9 +412,6 @@ class BidsDirView(QWidget):
                     self.threads[-1].start()
             else:
                 if self.parent.system == 'Linux':
-                    # subprocess.call(['xdg-open', f"{item_path}"])
-                    # operation = RunnableSubprocess(f'xdg-open {item_path}')
-                    # self.parent.threads_pool.start(operation)
                     self.threads.append(QThread())
                     self.operation = SubprocessWorker(f'xdg-open {item_path}')
                     self.operation.moveToThread(self.threads[-1])
@@ -369,9 +421,6 @@ class BidsDirView(QWidget):
                     self.threads[-1].finished.connect(self.threads[-1].deleteLater)
                     self.threads[-1].start()
                 elif self.parent.system == 'Darwin':
-                    # subprocess.call(['open', f"{item_path}"])
-                    # operation = RunnableSubprocess(f'open {item_path}')
-                    # self.parent.threads_pool.start(operation)
                     self.threads.append(QThread())
                     self.operation = SubprocessWorker(f'open {item_path}')
                     self.operation.moveToThread(self.threads[-1])
@@ -381,9 +430,6 @@ class BidsDirView(QWidget):
                     self.threads[-1].finished.connect(self.threads[-1].deleteLater)
                     self.threads[-1].start()
                 elif self.parent.system == 'Windows':
-                    # subprocess.call(['start', f"{item_path}"])
-                    # operation = RunnableSubprocess(f'start {item_path}')
-                    # self.parent.threads_pool.start(operation)
                     self.threads.append(QThread())
                     self.operation = SubprocessWorker(f'start {item_path}')
                     self.operation.moveToThread(self.threads[-1])
@@ -396,8 +442,22 @@ class BidsDirView(QWidget):
                     logging.warning('The program does not recognize the OS')
         else:
             pass
+        
 
     def openMenu(self, position):
+        """
+        
+
+        Parameters
+        ----------
+        position : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         menu = QMenu()
         openWith = menu.addAction('Open with')
         openAdd = 'None'
@@ -417,9 +477,6 @@ class BidsDirView(QWidget):
             logging.debug('Open With')
             self.itksnap = QFileDialog.getOpenFileName(self, "Select the path to itksnap")[0]
             if self.itksnap != None and self.itksnap != '':
-                # subprocess.call([self.itksnap, '-g', item_path])
-                # operation = RunnableSubprocess(f'{self.itksnap} -g {item_path}')
-                # self.parent.threads_pool.start(operation)
                 self.threads.append(QThread())
                 self.operation = SubprocessWorker(f'{self.itksnap} -g {item_path}')
                 self.operation.moveToThread(self.threads[-1])
@@ -434,9 +491,6 @@ class BidsDirView(QWidget):
 
         if action == openAdd:
             logging.debug('Open as additional image')
-            # subprocess.call([self.itksnap, '-o', item_path])
-            # operation = RunnableSubprocess(f'{self.itksnap} -o {item_path}')
-            # self.parent.threads_pool.start(operation)
             self.threads.append(QThread())
             self.operation = SubprocessWorker(f'{self.itksnap} -o {item_path}')
             self.operation.moveToThread(self.threads[-1])
@@ -447,10 +501,6 @@ class BidsDirView(QWidget):
             self.threads[-1].start()
 
         if action == openSeg:
-            logging.debug('Open as segmentation')
-            # subprocess.call([self.itksnap, '-s', item_path])
-            # operation = RunnableSubprocess(f'{self.itksnap} -s {item_path}')
-            # self.parent.threads_pool.start(operation)
             self.threads.append(QThread())
             self.operation = SubprocessWorker(f'{self.itksnap} -s {item_path}')
             self.operation.moveToThread(self.threads[-1])
@@ -459,31 +509,31 @@ class BidsDirView(QWidget):
             self.operation.finished.connect(self.operation.deleteLater)
             self.threads[-1].finished.connect(self.threads[-1].deleteLater)
             self.threads[-1].start()
+            
 
 
-
-# class BidsDirView(QWidget):
-
-#     def __init__(self, dir_path):
-# 		super().__init__()
-#         self.setWindowTitle('File System Viewer')
-# 		self.setMinimumSize(250, 700)
-
-# 		self.model = QFileSystemModel()
-# 		self.model.setRootPath(dir_path)
-# 		self.tree =  QTreeView()
-# 		self.tree.setModel(self.model)
-# 		self.tree.setRootIndex(self.model.index(dir_path))
-# 		self.tree.setColumnWidth(0, 250)
-# 		self.tree.setAlternatingRowColors(True)
-
-# 		layout = QVBoxLayout()
-# 		layout.addWidget(self.tree)
-# 		self.setLayout(layout)
-
+# =============================================================================
+# BidsMetaData
+# =============================================================================
 class BidsMetadata(QWidget):
+    """
+    """
+    
 
     def __init__(self, parent):
+        """
+        
+
+        Parameters
+        ----------
+        parent : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         super().__init__()
         self.parent = parent
         self.bids = self.parent.bids
@@ -513,8 +563,17 @@ class BidsMetadata(QWidget):
         layout.addWidget(self.authors)
 
         self.setLayout(layout)
+        
 
     def update_metadata(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         self.bids = self.parent.bids
         self.bids.update_number_of_subjects()
         self.number_of_subjects.setText(f"Number of subjects: {self.bids.number_of_subjects}")
@@ -530,10 +589,30 @@ class BidsMetadata(QWidget):
                 authors_lab = authors_lab + f'{author}\n         '
         self.bids_version.setText(f"BIDSVersion: {bids_version}")
         self.authors.setText(authors_lab)
+        
+        
 
+# =============================================================================
+# BidsActions
+# =============================================================================
 class BidsActions(QWidget):
+    """
+    """
+    
 
     def __init__(self, parent):
+        """
+
+        Parameters
+        ----------
+        parent : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         super().__init__()
         self.parent = parent
         self.bids = self.parent.bids
@@ -560,17 +639,6 @@ class BidsActions(QWidget):
         self.update_authors_button = QPushButton("Update authors")
         self.update_authors_button.clicked.connect(self.update_authors)
 
-        # layout = QVBoxLayout()
-        # sub_layout = QHBoxLayout()
-        # sub_layout.addWidget(self.add_button)
-        # sub_layout.addWidget(self.remove_button)
-        # sub_layout_1 = QHBoxLayout()
-        # sub_layout_1.addWidget(self.rename_sub_button)
-        # sub_layout_1.addWidget(self.rename_ses_button)
-        # layout.addWidget(self.change_bids_dir_button)
-        # layout.addLayout(sub_layout)
-        # layout.addLayout(sub_layout_1)
-
         layout = QGridLayout()
         layout.addWidget(self.change_bids_dir_button, 0, 0, 1, 2)
         layout.addWidget(self.add_button, 1, 0, 1, 1)
@@ -581,17 +649,30 @@ class BidsActions(QWidget):
         layout.addWidget(self.update_authors_button, 3, 1, 1, 1)
 
         self.setLayout(layout)
+        
 
     def change_bids_dir(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         logging.info("change_bids_dir")
-        # bids_dir = str(QFileDialog.getExistingDirectory(self, "Select BIDS Directory"))
-        # if os.path.isdir(bids_dir):
-        #     self.bids = BIDSHandler(root_dir=bids_dir, dicom2niix_path="dcm2niix")
-        #     self.parent.bids = self.bids
-        #     self.parent.update_bids()
         self.parent.update_bids()
+        
 
     def add(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         logging.info("add")
         if hasattr(self, 'add_win'):
             del self.add_win
@@ -604,46 +685,119 @@ class BidsActions(QWidget):
             self.bids.setDicom2niixPath(self.parent.dcm2niix_path)
         self.add_win.show()
 
+
     def remove(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         logging.info("remove")
         if hasattr(self, 'rm_win'):
             del self.rm_win
         self.rm_win = RemoveWindow(self)
         self.rm_win.show()
+        
 
     def rename_sub(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         logging.info("rename_sub")
         if hasattr(self, 'renameSub_win'):
             del self.renameSub_win
         self.renameSub_win = RenameSubject(self)
         self.renameSub_win.show()
+        
 
     def rename_ses(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         logging.info("rename_ses")
         if hasattr(self, 'renameSes_win'):
             del self.renameSes_win
         self.renameSes_win = RenameSession(self)
         self.renameSes_win.show()
+        
 
     def update_bids(self, parent):
+        """
+        
+
+        Parameters
+        ----------
+        parent : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         self.parent = parent
         self.bids = self.parent.bids
+        
 
     def rename_seq(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         logging.info("rename_seq")
         if hasattr(self, 'renameSeq_win'):
             del self.renameSeq_win
         self.renameSeq_win = RenameSequence(self)
         self.renameSeq_win.show()
+        
 
     def update_authors(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         logging.info("update_authors")
         if hasattr(self, 'updateAuthors_win'):
             del self.updateAuthors_win
         self.updateAuthors_win = UpdateAuthors(self)
         self.updateAuthors_win.show()
         
+        
     def setEnabledButtons(self, enabled):
+        """
+        
+
+        Parameters
+        ----------
+        enabled : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         self.change_bids_dir_button.setEnabled(enabled)
         self.add_button.setEnabled(enabled)
         self.remove_button.setEnabled(enabled)
@@ -651,11 +805,31 @@ class BidsActions(QWidget):
         self.rename_ses_button.setEnabled(enabled)
         self.rename_seq_button.setEnabled(enabled)
         self.update_authors_button.setEnabled(enabled)
+        
 
 
+# =============================================================================
+# RemoveWindow
+# =============================================================================
 class RemoveWindow(QMainWindow):
+    """
+    """
+    
 
     def __init__(self, parent):
+        """
+        
+
+        Parameters
+        ----------
+        parent : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         super().__init__()
         self.parent = parent
         self.bids = self.parent.bids
@@ -683,8 +857,17 @@ class RemoveWindow(QMainWindow):
         layout.addWidget(self.remove_button, 2, 0, 1, 2)
 
         self.window.setLayout(layout)
+        
 
     def remove(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         subject = self.subject.text()
         session = self.session.text()
         buttonReply = QMessageBox.question(self, 'Remove subject and/or session', "Do you want to delete the raw dicoms?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
@@ -692,9 +875,6 @@ class RemoveWindow(QMainWindow):
             logging.info(f"Removing sub-{subject} ses-{session}")
             if subject != "":
                 if session != "":
-                    # self.bids.delete_session(subject, session, delete_sourcedata=True)
-                    # operation = RunnableOperation(self.bids.delete_session, args=[subject, session], kwargs={'delete_sourcedata':True})
-                    # self.parent.threads_pool.start(operation)
                     self.parent.setEnabled(False)
                     self.thread = QThread()
                     self.operation = OperationWorker(self.bids.delete_session, args=[subject, session], kwargs={'delete_sourcedata':True})
@@ -710,9 +890,6 @@ class RemoveWindow(QMainWindow):
 
                     
                 else:
-                    # self.bids.delete_subject(subject, delete_sourcedata=True)
-                    # operation = RunnableOperation(self.bids.delete_subject, args=[subject], kwargs={'delete_sourcedata':True})
-                    # self.parent.threads_pool.start(operation)
                     self.parent.setEnabled(False)
                     self.thread = QThread()
                     self.operation = OperationWorker(self.bids.delete_subject, args=[subject], kwargs={'delete_sourcedata':True})
@@ -730,9 +907,6 @@ class RemoveWindow(QMainWindow):
             logging.info(f"Removing sub-{subject} ses-{session} while keeping the dicoms")
             if subject != "":
                 if session != "":
-                    # self.bids.delete_session(subject, session)
-                    # operation = RunnableOperation(self.bids.delete_session, args=[subject, session])
-                    # self.parent.threads_pool.start(operation)
                     self.parent.setEnabled(False)
                     self.thread = QThread()
                     self.operation = OperationWorker(self.bids.delete_session, args=[subject, session])
@@ -741,15 +915,11 @@ class RemoveWindow(QMainWindow):
                     self.operation.finished.connect(self.thread.quit)
                     self.operation.finished.connect(self.operation.deleteLater)
                     self.thread.finished.connect(self.thread.deleteLater)
-                    # self.operation.logHandler.log.signal.connect(self.write_log)
                     self.thread.start()
                     self.thread.finished.connect(
                         lambda: self.parent.setEnabled(True)
                     )
                 else:
-                    # self.bids.delete_subject(subject)
-                    # operation = RunnableOperation(self.bids.delete_subject, args=[subject])
-                    # self.parent.threads_pool.start(operation)
                     self.parent.setEnabled(False)
                     self.thread = QThread()
                     self.operation = OperationWorker(self.bids.delete_subject, args=[subject])
@@ -758,27 +928,52 @@ class RemoveWindow(QMainWindow):
                     self.operation.finished.connect(self.thread.quit)
                     self.operation.finished.connect(self.operation.deleteLater)
                     self.thread.finished.connect(self.thread.deleteLater)
-                    # self.operation.logHandler.log.signal.connect(self.write_log)
                     self.thread.start()
                     self.thread.finished.connect(
                         lambda: self.parent.setEnabled(True)
                     )
                     
         self.hide()
+        
 
     def center(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         qr = self.frameGeometry()
         cp = QDesktopWidget().availableGeometry().center()
         qr.moveCenter(cp)
         self.move(qr.topLeft())
-        
-    # @pyqtSlot(str)
-    # def write_log(self, log_text):
-    #     logging.info(log_text)
 
+
+
+# =============================================================================
+# AddWindow
+# =============================================================================
 class AddWindow(QMainWindow):
+    """
+    """
+    
 
     def __init__(self, parent):
+        """
+        
+
+        Parameters
+        ----------
+        parent : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         super().__init__()
         self.parent = parent
         self.bids = self.parent.bids
@@ -793,10 +988,7 @@ class AddWindow(QMainWindow):
 
         self.label = QLabel("Select DICOM folders to add to BIDS directory")
         self.label.setAlignment(Qt.AlignHCenter)
-        # self.subject = QLineEdit(self)
-        # self.subject.setPlaceholderText('Subject number')
-        # self.session = QLineEdit(self)
-        # self.session.setPlaceholderText('Session number')
+
         self.add_folder_button = QPushButton("Add DICOM Folder")
         self.add_folder_button.clicked.connect(self.add_folder)
         self.add_files_button = QPushButton("Add DICOM zip Files")
@@ -814,94 +1006,61 @@ class AddWindow(QMainWindow):
 
         layout = QGridLayout()
         layout.addWidget(self.label, 0, 0, 1, 2)
-        # layout.addWidget(self.subject, 1, 0, 1, 1)
-        # layout.addWidget(self.session, 1, 1, 1, 1)
         layout.addWidget(self.add_folder_button, 1, 0, 1, 1)
         layout.addWidget(self.add_files_button, 1, 1, 1, 1)
         layout.addWidget(self.list_view, 2, 0, 1, 2)
         layout.addWidget(self.add_button, 3, 0, 1, 2)
 
         self.window.setLayout(layout)
+        
 
     def add_folder(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         dicom_folder = str(QFileDialog.getExistingDirectory(self, "Select DICOM folder"))
         rowPosition = len(self.list_to_add)
         self.list_view.insertRow(rowPosition)
-        # subject = self.subject.text()
-        # session = self.session.text()
-        # if len(subject) != 3:
-        #     subject = None
-        # if len(session) != 2:
-        #     session = None
         self.list_view.setItem(rowPosition , 0, QTableWidgetItem(dicom_folder))
         self.list_view.setItem(rowPosition , 1, QTableWidgetItem(None))
         self.list_view.setItem(rowPosition , 2, QTableWidgetItem(None))
-        # self.list_to_add.append((dicom_folder, subject, session))
 
 
     def add_files(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         dicom_folder = QFileDialog.getOpenFileName(self, 'Select DICOM zip file')[0]
         rowPosition = len(self.list_to_add)
         self.list_view.insertRow(rowPosition)
-        # subject = self.subject.text()
-        # session = self.session.text()
-        # if len(subject) != 3:
-        #     subject = None
-        # if len(session) != 2:
-        #     session = None
         self.list_view.setItem(rowPosition , 0, QTableWidgetItem(dicom_folder))
         self.list_view.setItem(rowPosition , 1, QTableWidgetItem(None))
         self.list_view.setItem(rowPosition , 2, QTableWidgetItem(None))
-        # self.list_to_add.append((dicom_folder, subject, session))
+        
 
     def add(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         #get items
         for i in range(self.list_view.rowCount()):
             self.list_to_add.append((self.list_view.item(i,0).text(), self.list_view.item(i,1).text() if self.list_view.item(i,1).text() != '' else None, self.list_view.item(i,2).text() if self.list_view.item(i,2).text() != '' else None))
 
-        # for item in self.list_to_add:
-
-        #     dicom = item[0]
-
-        #     if ".zip" in dicom:
-        #         directory_to_extract_to = dicom[:-4]
-        #         with zipfile.ZipFile(dicom, 'r') as zip_ref:
-        #             zip_ref.extractall(directory_to_extract_to)
-        #         dicom = directory_to_extract_to
-
-        #     DICOM_FOLDER = dicom
-        #     PATIENT_ID = item[1]
-        #     SESSION = item[2]
-
-        #     try:
-        #         # pat_id, session, dicom_series = self.bids.convert_dicoms_to_bids(dicomfolder = DICOM_FOLDER,
-        #         #                                                                 pat_id      = PATIENT_ID,
-        #         #                                                                 session     = SESSION,
-        #         #                                                                 return_dicom_series=True)
-        #         operation = RunnableOperation(self.bids.convert_dicoms_to_bids, kwargs={'dicomfolder':DICOM_FOLDER, 'pat_id':PATIENT_ID, 'session':SESSION, 'return_dicom_series':True})
-        #         self.parent.threads_pool.start(operation)
-        #         operation.finished.connect(lambda last=(item == self.list_to_add[-1]): self.end_add(last))
-        #         self.parent.add_button.setEnabled(False)
-        #         self.thread = QThread()
-        #         self.operation = OperationWorker(self.bids.convert_dicoms_to_bids, kwargs={'dicomfolder':DICOM_FOLDER, 'pat_id':PATIENT_ID, 'session':SESSION, 'return_dicom_series':True})
-        #         self.operation.moveToThread(self.thread)
-        #         self.thread.started.connect(self.operation.run)
-        #         self.operation.finished.connect(self.thread.quit)
-        #         self.operation.finished.connect(self.operation.deleteLater)
-        #         self.thread.finished.connect(self.thread.deleteLater)
-        #         self.thread.start()
-        #         self.thread.finished.connect(
-        #             lambda: self.parent.add_button.setEnabled(True)
-        #         )
-        #         self.thread.finished.connect(lambda last=(item == self.list_to_add[-1]): self.end_add(last))
-        #         # logging.info(f"[INFO] done for patient {pat_id}")
-        #     except Exception as e:
-        #         logging.info(f'[ERROR] Dicom to Bids failed for {DICOM_FOLDER}: {e}')
-        #         # exc_type, exc_obj, exc_tb = sys.exc_info()
-        #         # fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        #         # logging.info(exc_type, fname, exc_tb.tb_lineno)
-        #         # traceback.logging.info_exc()
-        
         self.parent.setEnabled(False)
         self.thread = QThread()
         self.worker = AddWorker(self.bids, self.list_to_add)
@@ -910,31 +1069,64 @@ class AddWindow(QMainWindow):
         self.worker.finished.connect(self.thread.quit)
         self.worker.finished.connect(self.worker.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
-        # self.worker.logHandler.log.signal.connect(self.write_log)
-        # self.thread.finished.connect(lambda: self.parent.setEnabled(True))
         self.thread.finished.connect(lambda: self.end_add())
         self.thread.start()
         
         self.hide()
         
+        
     def end_add(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         self.parent.parent.bids_metadata.update_metadata()
         logging.info(f'All done.')
         self.parent.setEnabled(True)
 
+
     def center(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         qr = self.frameGeometry()
         cp = QDesktopWidget().availableGeometry().center()
         qr.moveCenter(cp)
         self.move(qr.topLeft())
-    
-    # @pyqtSlot(str)
-    # def write_log(self, log_text):
-    #     logging.info(log_text)
+        
 
+
+# =============================================================================
+# RenameSubject
+# =============================================================================
 class RenameSubject(QMainWindow):
+    """
+    """
+    
 
     def __init__(self, parent):
+        """
+        
+
+        Parameters
+        ----------
+        parent : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         super().__init__()
         self.parent = parent
         self.bids = self.parent.bids
@@ -958,14 +1150,20 @@ class RenameSubject(QMainWindow):
         layout.addWidget(self.rename_button, 1, 0, 1, 2)
 
         self.window.setLayout(layout)
+        
 
     def rename(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         old_sub = self.old_sub.text()
         new_sub = self.new_sub.text()
 
-        # self.bids.rename_subject(old_sub, new_sub)
-        # operation = RunnableOperation(self.bids.rename_subject, args=[old_sub, new_sub])
-        # self.parent.threads_pool.start(operation)
         self.parent.setEnabled(False)
         self.thread = QThread()
         self.operation = OperationWorker(self.bids.rename_subject, args=[old_sub, new_sub])
@@ -974,7 +1172,6 @@ class RenameSubject(QMainWindow):
         self.operation.finished.connect(self.thread.quit)
         self.operation.finished.connect(self.operation.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
-        # self.operation.logHandler.log.signal.connect(self.write_log)
         self.thread.start()
         self.thread.finished.connect(
             lambda: self.parent.setEnabled(True)
@@ -982,20 +1179,45 @@ class RenameSubject(QMainWindow):
         logging.info(f"sub-{old_sub} renamed to sub-{new_sub}")
         
         self.hide()
+        
 
     def center(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         qr = self.frameGeometry()
         cp = QDesktopWidget().availableGeometry().center()
         qr.moveCenter(cp)
         self.move(qr.topLeft())
-    
-    # @pyqtSlot(str)
-    # def write_log(self, log_text):
-    #     logging.info(log_text)
+        
 
+
+# =============================================================================
+# ReneameSession
+# =============================================================================
 class RenameSession(QMainWindow):
+    """
+    """
     
     def __init__(self, parent):
+        """
+        
+
+        Parameters
+        ----------
+        parent : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         super().__init__()
         self.parent = parent
         self.bids = self.parent.bids
@@ -1023,14 +1245,20 @@ class RenameSession(QMainWindow):
 
         self.window.setLayout(layout)
         
+        
     def rename(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         sub = self.sub.text()
         old_ses = self.old_ses.text()
         new_ses = self.new_ses.text()
         
-        # self.bids.rename_session(sub, old_ses, new_ses)
-        # operation = RunnableOperation(self.bids.rename_session, args=[sub, old_ses, new_ses])
-        # self.parent.threads_pool.start(operation)
         self.parent.setEnabled(False)
         self.thread = QThread()
         self.operation = OperationWorker(self.bids.rename_session, args=[sub, old_ses, new_ses])
@@ -1039,7 +1267,6 @@ class RenameSession(QMainWindow):
         self.operation.finished.connect(self.thread.quit)
         self.operation.finished.connect(self.operation.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
-        # self.operation.logHandler.log.signal.connect(self.write_log)
         self.thread.start()
         self.thread.finished.connect(
             lambda: self.parent.setEnabled(True)
@@ -1048,19 +1275,44 @@ class RenameSession(QMainWindow):
         
         self.hide()
         
+        
     def center(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         qr = self.frameGeometry()
         cp = QDesktopWidget().availableGeometry().center()
         qr.moveCenter(cp)
         self.move(qr.topLeft())
-    
-    # @pyqtSlot(str)
-    # def write_log(self, log_text):
-    #     logging.info(log_text)
 
+
+
+# =============================================================================
+# RenameSequence
+# =============================================================================
 class RenameSequence(QMainWindow):
+    """
+    """
 
     def __init__(self, parent):
+        """
+        
+
+        Parameters
+        ----------
+        parent : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         super().__init__()
         self.parent = parent
         self.bids = self.parent.bids
@@ -1084,14 +1336,20 @@ class RenameSequence(QMainWindow):
         layout.addWidget(self.rename_button, 1, 0, 1, 2)
 
         self.window.setLayout(layout)
+        
 
     def rename_seq(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         old_seq = self.old_seq.text()
         new_seq = self.new_seq.text()
 
-        # self.bids.rename_sequence(old_seq, new_seq)
-        # operation = RunnableOperation(self.bids.rename_sequence, args=[old_seq, new_seq])
-        # self.parent.threads_pool.start(operation)
         self.parent.setEnabled(False)
         self.thread = QThread()
         self.operation = OperationWorker(self.bids.rename_sequence, args=[old_seq, new_seq])
@@ -1100,7 +1358,6 @@ class RenameSequence(QMainWindow):
         self.operation.finished.connect(self.thread.quit)
         self.operation.finished.connect(self.operation.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
-        # self.operation.logHandler.log.signal.connect(self.write_log)
         self.thread.start()
         self.thread.finished.connect(
             lambda: self.parent.setEnabled(True)
@@ -1108,20 +1365,46 @@ class RenameSequence(QMainWindow):
         logging.info(f"old {old_seq} renamed to new {new_seq}")
         
         self.hide()
+        
 
     def center(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         qr = self.frameGeometry()
         cp = QDesktopWidget().availableGeometry().center()
         qr.moveCenter(cp)
         self.move(qr.topLeft())
-    
-    # @pyqtSlot(str)
-    # def write_log(self, log_text):
-    #     logging.info(log_text)
 
+
+
+# =============================================================================
+# UpdateAuthors
+# =============================================================================
 class UpdateAuthors(QMainWindow):
+    """
+    """
+
 
     def __init__(self, parent):
+        """
+        
+
+        Parameters
+        ----------
+        parent : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         super().__init__()
         self.parent = parent
         self.bids = self.parent.bids
@@ -1142,16 +1425,22 @@ class UpdateAuthors(QMainWindow):
         layout.addWidget(self.update_authors_button)
 
         self.window.setLayout(layout)
+        
 
     def update_authors(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         authors = self.authors.text()
         if ',' in authors:
             authors_list = authors.split(',')
         else:
             authors_list = [authors]
-        # self.bids.update_authors_to_dataset_description(self.bids.root_dir, authors=authors_list)
-        # operation = RunnableOperation(self.bids.update_authors_to_dataset_description, args=[self.bids.root_dir], kwargs={'authors':authors_list})
-        # self.parent.threads_pool.start(operation)
         self.parent.setEnabled(False)
         self.thread = QThread()
         self.operation = OperationWorker(self.bids.update_authors_to_dataset_description, args=[self.bids.root_dir], kwargs={'authors':authors_list})
@@ -1163,327 +1452,178 @@ class UpdateAuthors(QMainWindow):
         self.operation.finished.connect(self.thread.quit)
         self.operation.finished.connect(self.operation.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
-        # self.operation.logHandler.log.signal.connect(self.write_log)
         self.thread.start()
         self.thread.finished.connect(
             lambda: self.parent.setEnabled(True)
         )
         self.thread.finished.connect(lambda: self.end_update())
         logging.info(f"Updating {authors} as BIDS directory authors")
-        # operation.finished.connect(self.end_update)
         self.parent.parent.bids_metadata.update_metadata()
         
         self.hide()
         
+        
     def end_update(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         logging.info('Thread ended')
         self.parent.parent.bids_metadata.update_metadata()
 
+
     def center(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         qr = self.frameGeometry()
         cp = QDesktopWidget().availableGeometry().center()
         qr.moveCenter(cp)
         self.move(qr.topLeft())
-    
-    # @pyqtSlot(str)
-    # def write_log(self, log_text):
-    #     logging.info(log_text)
-
-
-# class QTextEditLogger(logging.Handler):
-#     def __init__(self, parent):
-#         super().__init__()
-#         self.widget = QPlainTextEdit(parent)
-#         self.widget.setReadOnly(True)
-
-#     def emit(self, record):
-#         msg = self.format(record)
-#         self.widget.appendPlainText(msg)
-
-# class BidsDialog(QDialog, QPlainTextEdit):
-
-#     def __init__(self, parent):
-#         super().__init__()
-#         self.parent = parent
-#         self.bids = self.parent.bids
-#         self.threads_pool = self.parent.threads_pool
-
-#         self.setMinimumSize(700,300)
-
-#         logTextBox = QTextEditLogger(self)
-#         logTextBox.setFormatter(logging.Formatter('[%(levelname)s] - %(message)s'))
-#         self.bids.addLoggerHandler(logTextBox)
-#         # logger.addHandler(logTextBox)
-#         # logger.setLevel(logging.DEBUG)
-#         # self.stdout = sys.stdout
-#         # stdout_logger = logging.getLogger('STDOUT')
-#         # sl = StreamToLogger(stdout_logger, logging.INFO)
-#         # sys.stdout = sl
-
-#         # self._button = QPushButton('Test me')
-#         # self._button.clicked.connect(self.test)
-
-#         layout = QVBoxLayout()
-#         layout.addWidget(logTextBox.widget)
-#         # layout.addWidget(self._button)
-#         self.setLayout(layout)
-
-#     # def test(self):
-#     #     logging.info('damn, a bug')
-#     #     logging.info('something to remember')
-#     #     logging.info('that\'s not right')
-#     #     logging.info('foobar')
-
-#     # def closeEvent(self, event):
-#     #     sys.stdout = self.stdout
-
-#     # def close(self):
-#     #     sys.stdout = self.stdout
-
-# class QTextEditLogger(logging.Handler):
-#     def __init__(self, parent):
-#         super().__init__()
-#         self.widget = QPlainTextEdit(parent)
-#         self.widget.setReadOnly(True)
-
-#     def emit(self, record):
-#         msg = self.format(record)
-#         self.widget.appendPlainText(msg)
-
-
-# class BidsDialog(QDialog):
-#     def __init__(self, parent):
-#         super().__init__()
-#         self.parent = parent
-#         self.bids = self.parent.bids
         
-#         self.setMinimumSize(700,300)
-
-#         # Setup logging here:
-#         self.logTextBox = QTextEditLogger(self)
-#         self.logTextBox.setFormatter(
-#             logging.Formatter("%(levelname)s - %(message)s")
-#         )
-#         logging.getLogger().addHandler(self.logTextBox)
-#         logging.getLogger().setLevel(logging.DEBUG)
-
-#         # self._button = QtWidgets.QPushButton()
-#         # self._button.setText("Start")
-
-#         layout = QVBoxLayout(self)
-#         layout.addWidget(self.logTextBox.widget)
-#         # layout.addWidget(self._button)
-
-#         # self._button.clicked.connect(self.test)
-
-#         self.process = QProcess()
-#         self.process.readyReadStandardOutput.connect(
-#             self.handle_readyReadStandardOutput
-#         )
-#         # self.process.started.connect(lambda: print("Started!"))
-#         # self.process.finished.connect(lambda: print("Finished!"))
-
-#     # def test(self):
-#     #     logging.debug("damn, a bug")
-#     #     logging.info("something to remember")
-#     #     logging.warning("that's not right")
-#     #     logging.error("foobar")
-
-#     #     script = os.path.join(CURRENT_DIR, "another_module.py")
-#     #     self.process.start(sys.executable, [script])
-
-#     def handle_readyReadStandardOutput(self):
-#         text = self.process.readAllStandardOutput().data().decode()
-#         self.logTextBox.widget.appendPlainText(text.strip())
-
-# class StreamToLogger(object):
-#     """
-#     Fake file-like stream object that redirects writes to a logger instance.
-#     """
-#     def __init__(self, logger, log_level=logging.INFO):
-#         self.logger = logger
-#         self.log_level = log_level
-#         self.linebuf = ''
-
-#     def write(self, buf):
-#         temp_linebuf = self.linebuf + buf
-#         self.linebuf = ''
-#         for line in temp_linebuf.splitlines(True):
-#             # From the io.TextIOWrapper docs:
-#             #   On output, if newline is None, any '\n' characters written
-#             #   are translated to the system default line separator.
-#             # By default sys.stdout.write() expects '\n' newlines and then
-#             # translates them so this is still cross platform.
-#             if line[-1] == '\n':
-#                 self.logger.log(self.log_level, line.rstrip())
-#             else:
-#                 self.linebuf += line
-
-#     def flush(self):
-#         if self.linebuf != '':
-#             self.logger.log(self.log_level, self.linebuf.rstrip())
-#         self.linebuf = ''
-
-# class MyDialog(QDialog, QPlainTextEdit):
-#     def __init__(self, parent=None):
-#         super().__init__(parent)
-
-#         logTextBox = QTextEditLogger(self)
-#         # You can format what is logging.infoed to text box
-#         logTextBox.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-#         logging.getLogger().addHandler(logTextBox)
-#         # You can control the logging level
-#         logging.getLogger().setLevel(logging.DEBUG)
-
-#         self._button = QPushButton(self)
-#         self._button.setText('Test Me')
-
-#         layout = QVBoxLayout()
-#         # Add the new logging box widget to the layout
-#         layout.addWidget(logTextBox.widget)
-#         layout.addWidget(self._button)
-#         self.setLayout(layout)
-
-#         # Connect signal to slot
-#         self._button.clicked.connect(self.test)
-
-#     def test(self):
-#         logging.debug('damn, a bug')
-#         logging.info('something to remember')
-#         logging.warning('that\'s not right')
-#         logging.error('foobar')
-
-# class Signals(QObject):
-#     finished = pyqtSignal()
-
-class RunnableSubprocess(QObject, QRunnable):
-    finished = pyqtSignal()
-    
-    def __init__(self, operation):
-        super().__init__()
-        self.operation = operation
-        # self.signal = Signals()
         
-    def run(self):
-        subprocess.Popen(self.operation, shell=True).wait()
-        # self.signal.finished.emit()
-        self.finished.emit()
-        
+     
+# =============================================================================
+# SubprocessWorker
+# =============================================================================
 class SubprocessWorker(QObject):
+    """
+    """
     finished = pyqtSignal()
     progress = pyqtSignal(int)
     
+    
     def __init__(self, operation):
+        """
+        
+
+        Parameters
+        ----------
+        operation : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         super().__init__()
         self.operation = operation
         
-        # # self.signal = Signals()
-        # self.logger = logging.getLogger("Worker")
-
-        # # set up log handler
-        # self.logHandler = ThreadLogger()
-        # self.logHandler.setFormatter(
-        #     logging.Formatter('%(asctime)s - %(levelname)s - %(threadName)s - %(message)s'))
-        # self.logger.addHandler(self.logHandler)
-
-        # # set the logging level
-        # self.logger.setLevel(logging.DEBUG)
-        
     def run(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         subprocess.Popen(self.operation, shell=True).wait()
-        # self.signal.finished.emit()
         self.finished.emit()
         
-class RunnableOperation(QObject, QRunnable):
-    finished = pyqtSignal()
-    
-    def __init__(self, function, args=[], kwargs={}):
-        super().__init__()
-        self.function = function
-        self.args = args
-        self.kwargs = kwargs
-        # self.signal = Signals()
-        
-    def run(self):
-        self.function(*self.args, **self.kwargs)
-        # self.signal.finished.emit()
-        self.finished.emit()
-        
+      
+     
+# =============================================================================
+# OperationWorker
+# =============================================================================
 class OperationWorker(QObject):
+    """
+    """
     finished = pyqtSignal()
     progress = pyqtSignal(int)
     
+    
     def __init__(self, function, args=[], kwargs={}):
+        """
+        
+
+        Parameters
+        ----------
+        function : TYPE
+            DESCRIPTION.
+        args : TYPE, optional
+            DESCRIPTION. The default is [].
+        kwargs : TYPE, optional
+            DESCRIPTION. The default is {}.
+
+        Returns
+        -------
+        None.
+
+        """
         super().__init__()
         self.function = function
         self.args = args
         self.kwargs = kwargs
         
-        # # self.signal = Signals()
-        # self.logger = logging.getLogger("Worker")
-
-        # # set up log handler
-        # self.logHandler = ThreadLogger()
-        # self.logHandler.setFormatter(
-        #     logging.Formatter('%(asctime)s - %(levelname)s - %(threadName)s - %(message)s'))
-        # self.logger.addHandler(self.logHandler)
-
-        # # set the logging level
-        # self.logger.setLevel(logging.DEBUG)
-        
-        # self.kwargs['logger'] = self.logger
         
     def run(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         try:
-            # logging.debug('Operation run has been called and is now running')
             self.function(*self.args, **self.kwargs)
-            # self.signal.finished.emit()
         except Exception as e:
             pass
         self.finished.emit()
         
-# class MyLog(QObject):
-#     # create a new Signal
-#     # - have to be a static element
-#     # - class  has to inherit from QObject to be able to emit signals
-#     signal = pyqtSignal(str)
 
-#     # not sure if it's necessary to implement this
-#     def __init__(self):
-#         super().__init__()
-        
-# class ThreadLogger(logging.Handler):
-#     def __init__(self):
-#         super().__init__()
-#         self.log = MyLog()
 
-#     # logging.Handler.emit() is intended to be implemented by subclasses
-#     def emit(self, record):
-#         msg = self.format(record)
-#         self.log.signal.emit(msg)
-        
+# =============================================================================
+# AddWorker
+# =============================================================================
 class AddWorker(QObject):
+    """
+    """
     finished = pyqtSignal()
     progress = pyqtSignal(int)
     
+    
     def __init__(self, bids, list_to_add):
+        """
+        
+
+        Parameters
+        ----------
+        bids : TYPE
+            DESCRIPTION.
+        list_to_add : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         super().__init__()
         self.bids = bids
         self.list_to_add = list_to_add
         
-        # # self.signal = Signals()
-        # self.logger = logging.getLogger("Worker")
-
-        # # set up log handler
-        # self.logHandler = ThreadLogger()
-        # self.logHandler.setFormatter(
-        #     logging.Formatter('%(asctime)s - %(levelname)s - %(threadName)s - %(message)s'))
-        # self.logger.addHandler(self.logHandler)
-
-        # # set the logging level
-        # self.logger.setLevel(logging.DEBUG)
         
     def run(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         for item in self.list_to_add:
 
             dicom = item[0]
@@ -1504,33 +1644,82 @@ class AddWorker(QObject):
                                                     session     = SESSION,
                                                     return_dicom_series=True)
                 
-                # logging.info(f"[INFO] done for patient {pat_id}")
             except Exception as e:
-                # logging.info(f'[ERROR] Dicom to Bids failed for {DICOM_FOLDER}: {e}')
-                # exc_type, exc_obj, exc_tb = sys.exc_info()
-                # fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-                # logging.info(exc_type, fname, exc_tb.tb_lineno)
-                # traceback.logging.info_exc()
                 pass
         self.finished.emit()
         
+        
+
+# =============================================================================
+# StdOutTextEdit
+# =============================================================================
 class StdOutTextEdit(QPlainTextEdit):
+    """
+    """
+    
+    
     def __init__(self, parent):
+        """
+        
+
+        Parameters
+        ----------
+        parent : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         super(StdOutTextEdit, self).__init__()
         self.setParent(parent)
         self.setReadOnly(True)
-        # self.setLineWidth(50)
         self.setMinimumSize(700,300)
-        # self.setFont(QFont('Consolas', 11))
+
 
     @pyqtSlot(str)
     def append_text(self, text: str):
+        """
+        
+
+        Parameters
+        ----------
+        text : str
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         self.moveCursor(QTextCursor.End)
         self.insertPlainText(text)
 
 
+
+# =============================================================================
+# StdTQDMTextEdit
+# =============================================================================
 class StdTQDMTextEdit(QLineEdit):
+    """
+    """
+    
+    
     def __init__(self, parent):
+        """
+        
+
+        Parameters
+        ----------
+        parent : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         super(StdTQDMTextEdit, self).__init__()
         self.setParent(parent)
         self.setReadOnly(True)
@@ -1540,8 +1729,22 @@ class StdTQDMTextEdit(QLineEdit):
         self.setClearButtonEnabled(True)
         self.setFont(QFont('Consolas', 11))
 
+
     @pyqtSlot(str)
     def set_tqdm_text(self, text: str):
+        """
+        
+
+        Parameters
+        ----------
+        text : str
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         new_text = text
         if new_text.find('\r') >= 0:
             new_text = new_text.replace('\r', '').rstrip()

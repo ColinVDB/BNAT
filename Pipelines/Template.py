@@ -53,12 +53,46 @@ from tqdm.auto import tqdm
 
 
 def launch(parent):
+    """
+    
+
+    Parameters
+    ----------
+    parent : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
     window = MainWindow(parent)
     window.show()
 
+
+
+# =============================================================================
+# MainWindow
+# =============================================================================
 class MainWindow(QMainWindow):
+    """
+    """
+    
 
     def __init__(self, parent):
+        """
+        
+
+        Parameters
+        ----------
+        parent : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         super().__init__()
         self.parent = parent
         self.bids = self.parent.bids
@@ -74,15 +108,45 @@ class MainWindow(QMainWindow):
 
         self.window.setLayout(layout)
 
+
     def center(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         qr = self.frameGeometry()
         cp = QDesktopWidget().availableGeometry().center()
         qr.moveCenter(cp)
         self.move(qr.topLeft())
 
+
+
+# =============================================================================
+# TemplateTab
+# =============================================================================
 class TemplateTab(QWidget):
+    """
+    """
+    
 
     def __init__(self, parent):
+        """
+        
+
+        Parameters
+        ----------
+        parent : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         super().__init__()
         self.parent = parent
         self.bids = self.parent.bids
@@ -98,7 +162,16 @@ class TemplateTab(QWidget):
         
         self.setLayout(layout)
 
+
     def action(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         self.thread = QThread()
         self.action = ActionWorker()
         self.action.moveToThread(self.thread)
@@ -111,14 +184,38 @@ class TemplateTab(QWidget):
         self.parent.hide()
 
 
+
+# =============================================================================
+# ActionWorker
+# =============================================================================
 class ActionWorker(QObject):
+    """
+    """
     finished = pyqtSignal()
     progress = pyqtSignal(int)
+    
 
     def __init__(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         super().__init__()
+        
 
     def run(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
         # Action
         logging.info('Beginning of the action')
         time.sleep(10)
