@@ -1,3 +1,13 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Nov 10 14:25:40 2021
+
+@author: ColinVDB
+Template
+"""
+
+
 import sys
 import os
 from os.path import join as pjoin

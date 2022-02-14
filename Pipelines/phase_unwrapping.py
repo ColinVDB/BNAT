@@ -4,7 +4,7 @@
 Created on Wed Nov 10 14:25:40 2021
 
 @author: ColinVDB
-rec-star_FLAIR
+phase_unwrapping
 """
 
 
@@ -108,12 +108,12 @@ class MainWindow(QMainWindow):
         self.parent = parent
         self.bids = self.parent.bids
 
-        self.setWindowTitle("Rec-star_FLAIR computation")
+        self.setWindowTitle("Phase Unwrapping")
         self.window = QWidget(self)
         self.setCentralWidget(self.window)
         self.center()
         
-        self.tab = FlairStarTab(self)
+        self.tab = PhaseUnwrappingTab(self)
         layout = QVBoxLayout()
         layout.addWidget(self.tab)
 
@@ -139,7 +139,7 @@ class MainWindow(QMainWindow):
 # =============================================================================
 # FlairStarTab
 # =============================================================================
-class FlairStarTab(QWidget):
+class PhaseUnwrappingTab(QWidget):
     """
     """
     
@@ -169,18 +169,18 @@ class FlairStarTab(QWidget):
         self.sessions_input = QLineEdit(self)
         self.sessions_input.setPlaceholderText("Select sessions")
         
-        self.flairStar_button = QPushButton("Computation of the Flair Star")
-        self.flairStar_button.clicked.connect(self.flairStar_computation)
+        self.phase_unwrapping_button = QPushButton("Phase Unwrapping")
+        self.phase_unwrapping_button.clicked.connect(self.phase_unwrapping)
         
         layout = QVBoxLayout()
         layout.addWidget(self.subjects_input)
         layout.addWidget(self.sessions_input)
-        layout.addWidget(self.flairStar_button)
+        layout.addWidget(self.phase_unwrapping_button)
         
         self.setLayout(layout)
         
 
-    def flairStar_computation(self):
+    def phase_unwrapping(self):
         """
         
 
@@ -274,7 +274,7 @@ class FlairStarTab(QWidget):
 
         """
         if last:
-            logging.info("rec-star_FLAIR Pipeline has finished working")
+            logging.info("Phase Unwrapping Pipeline has finished working")
 
 
 
@@ -322,27 +322,27 @@ class FlairStarWorker(QObject):
 
         """
         # Action
-        derivative = 'rec-star_FLAIR'
+        derivative = 'phase_unwrapped'
         sub_ses_directory = pjoin(self.bids.root_dir, f'sub-{self.sub}', f'ses-{self.ses}', 'anat')
-        flair = f'sub-{self.sub}_ses-{self.ses}_FLAIR.nii.gz'
-        t2star = f'sub-{self.sub}_ses-{self.ses}_part-mag_T2starw.nii.gz'
-        flair_star = f'sub-{self.sub}_ses-{self.ses}_{derivative}.nii.gz'
+        phase_wrapped = f'sub-{self.sub}_ses-{self.ses}_part-phase_T2starw_WRAPPED.nii.gz'
+        phase_unwrapped_output = f'sub-{self.sub}_ses-{self.ses}_part-phase_T2starw'
+        phase_unwrapped = f'sub-{self.sub}_ses-{self.ses}_part-phase_T2starw_UNWRAPPED.nii.gz'
         # Create directory
         directories = [pjoin('derivatives', derivative), pjoin('derivatives', derivative, f'sub-{self.sub}'), pjoin('derivatives', derivative, f'sub-{self.sub}', f'ses-{self.ses}')]
         self.bids.mkdirs_if_not_exist(self.bids.root_dir, directories=directories)
         sub_ses_derivative_path = pjoin(self.bids.root_dir, 'derivatives', derivative, f'sub-{self.sub}', f'ses-{self.ses}')
         # Perform Flair Star computation
         try:
-            logging.info(f'Computing FlairStar for sub-{self.sub} ses-{self.ses}...')
+            logging.info(f'Phase Unwrapping for sub-{self.sub} ses-{self.ses}...')
             
             # subprocess.Popen('echo Abrico2021 | sudo chmod 666 /var/run/docker.sock')
-            subprocess.Popen(f'docker run --rm -v {sub_ses_directory}:/data blakedewey/flairstar -f {flair} -t {t2star} -o {flair_star}', shell=True).wait()
+            subprocess.Popen(f'docker run --rm -v {sub_ses_directory}:/data blakedewey/phase_unwrap -p {phase_wrapped} -o {phase_unwrapped_output}', shell=True).wait()
             
-            shutil.move(pjoin(sub_ses_directory, flair_star), sub_ses_derivative_path)
+            shutil.move(pjoin(sub_ses_directory, phase_unwrapped), sub_ses_derivative_path)
             
-            logging.info(f'FlairStar for sub-{self.sub} ses-{self.ses} computed!')
+            logging.info(f'Phase Unwrapped for sub-{self.sub} ses-{self.ses} computed!')
         except Exception as e:
-            logging.error(f'Error {e} when computing FlairStar for sub-{self.sub}_ses{self.ses}!')
+            logging.error(f'Error {e} when Unwrapping the phase for sub-{self.sub}_ses{self.ses}!')
         self.finished.emit()
 
 

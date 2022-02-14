@@ -765,11 +765,25 @@ class BIDSHandler:
                 bids_filename = bids_filename + bids_sequence_name['modality_bids']
                 BIDSHandler.mkdir_if_not_exists(pjoin(self.root_dir, f'sub-{pat_id}', f'ses-{session}', bids_sequence_name['MRI_type']))
                 move_all(path, filename, file_extensions, pjoin(self.root_dir, f"sub-{pat_id}", f"ses-{session}", bids_sequence_name['MRI_type']), bids_filename)
-            else:
+            elif bids_sequence_name.get('MRI_type') == 'IGNORED':
                 print('Remove', filename)
                 for ext in file_extensions:
                     if pexists(pjoin(path,f'{filename}{ext}')):
                         os.remove(pjoin(path,f'{filename}{ext}'))
+            else:
+                bids_filename = f'sub-{pat_id}_ses-{session}_'
+                for key in bids_sequence_name.keys():
+                    if key not in ['modality_bids', 'MRI_type']:
+                        field = key.replace('_bids','')
+                        label = bids_sequence_name[key]
+                        try:
+                            label = int(label)
+                        except ValueError:
+                            pass                                
+                        bids_filename = bids_filename + f'{field}-{label}_'
+                bids_filename = bids_filename + 'unrecognized_sequence'
+                BIDSHandler.mkdir_if_not_exists(pjoin(self.root_dir, f'sub-{pat_id}', 'unrecognized_sequences'))
+                move_all(path, filename, file_extensions, pjoin(self.root_dir, f"sub-{pat_id}", f"ses-{session}", 'unrecognized_sequences'), bids_filename)
                             
                                 
     @staticmethod

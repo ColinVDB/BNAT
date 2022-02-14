@@ -74,12 +74,13 @@ faulthandler.enable()
 # =============================================================================
 class MainWindow(QMainWindow):
     """
+    Main Window of the application
     """
     
     
     def __init__(self):
         """
-        
+        Create an instance of the the Main Window
 
         Returns
         -------
@@ -128,7 +129,7 @@ class MainWindow(QMainWindow):
 
     def init_ui(self):
         """
-        
+        Build all the widgets composing the GUI
 
         Returns
         -------
@@ -202,7 +203,7 @@ class MainWindow(QMainWindow):
 
     def center(self):
         """
-        
+        Used to center the window 
 
         Returns
         -------
@@ -217,12 +218,13 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         """
-        
+        Performs last actions to be executed to cleanly close the 
+        application
 
         Parameters
         ----------
-        event : TYPE
-            DESCRIPTION.
+        event : an event
+            /
 
         Returns
         -------
@@ -240,7 +242,8 @@ class MainWindow(QMainWindow):
     
     def close(self):
         """
-        
+        Performs last actions to be executed to cleanly close the 
+        application
 
         Returns
         -------
@@ -258,7 +261,7 @@ class MainWindow(QMainWindow):
 
     def update_bids(self):
         """
-        
+        Update the GUI when the bids database has been modified
 
         Returns
         -------
@@ -297,12 +300,12 @@ class MainWindow(QMainWindow):
 
     def launch_pipeline(self, pipe):
         """
-        
+        Used to launch a pipeline
 
         Parameters
         ----------
-        pipe : TYPE
-            DESCRIPTION.
+        pipe : a pipeline
+            GUI to allow the user to run a pipeline on the database
 
         Returns
         -------
@@ -318,17 +321,18 @@ class MainWindow(QMainWindow):
 # =============================================================================
 class BidsDirView(QWidget):
     """
+    Representation of the BIDS directory
     """
     
 
     def __init__(self, parent):
         """
-        
+        Create an instance of the Viewer of the BIDS directory
 
         Parameters
         ----------
-        parent : TYPE
-            DESCRIPTION.
+        parent : MainWindow
+            pointer towards the main window (parent of this widget)
 
         Returns
         -------
@@ -365,7 +369,7 @@ class BidsDirView(QWidget):
 
     def update_dir(self):
         """
-        
+        Update the directory viewer
 
         Returns
         -------
@@ -380,12 +384,12 @@ class BidsDirView(QWidget):
 
     def treeMedia_doubleClicked(self, index):
         """
-        
+        Action to be performed when an item is double clicked
 
         Parameters
         ----------
-        index : TYPE
-            DESCRIPTION.
+        index : QIndex
+            index of the item that has been double clicked 
 
         Returns
         -------
@@ -446,12 +450,12 @@ class BidsDirView(QWidget):
 
     def openMenu(self, position):
         """
-        
+        Open a drop down menu when right clicking on an item
 
         Parameters
         ----------
-        position : TYPE
-            DESCRIPTION.
+        position : a position
+            The position of the mouse
 
         Returns
         -------
@@ -517,17 +521,18 @@ class BidsDirView(QWidget):
 # =============================================================================
 class BidsMetadata(QWidget):
     """
+    Widget containing all meta data about the Bids Database
     """
     
 
     def __init__(self, parent):
         """
-        
+        Create an instance of the BidsMetadat Widget
 
         Parameters
         ----------
-        parent : TYPE
-            DESCRIPTION.
+        parent : MainWindow
+            pointer towards the MainWindow (parent of this widget)
 
         Returns
         -------
@@ -567,7 +572,7 @@ class BidsMetadata(QWidget):
 
     def update_metadata(self):
         """
-        
+        Update the metadata information
 
         Returns
         -------
@@ -597,16 +602,19 @@ class BidsMetadata(QWidget):
 # =============================================================================
 class BidsActions(QWidget):
     """
+    Widget containing all the possible actions that can be performed on the 
+    Bids Database
     """
     
 
     def __init__(self, parent):
         """
+        Create an instance of the BidsAction Widget
 
         Parameters
         ----------
-        parent : TYPE
-            DESCRIPTION.
+        parent : MainWindow
+            Pointer towards the Main Window (parent of this widget)
 
         Returns
         -------
@@ -653,7 +661,7 @@ class BidsActions(QWidget):
 
     def change_bids_dir(self):
         """
-        
+        Change bids directory
 
         Returns
         -------
@@ -666,7 +674,7 @@ class BidsActions(QWidget):
 
     def add(self):
         """
-        
+        Add a new subject/session
 
         Returns
         -------
@@ -688,7 +696,7 @@ class BidsActions(QWidget):
 
     def remove(self):
         """
-        
+        Remove subject/session
 
         Returns
         -------
@@ -704,7 +712,7 @@ class BidsActions(QWidget):
 
     def rename_sub(self):
         """
-        
+        Rename subject
 
         Returns
         -------
@@ -720,7 +728,7 @@ class BidsActions(QWidget):
 
     def rename_ses(self):
         """
-        
+        Rename session
 
         Returns
         -------
@@ -736,12 +744,12 @@ class BidsActions(QWidget):
 
     def update_bids(self, parent):
         """
-        
+        Update Bids directory
 
         Parameters
         ----------
-        parent : TYPE
-            DESCRIPTION.
+        parent : MainWindow
+            Pointer towards the Main Window (parent to this widget)
 
         Returns
         -------
@@ -754,7 +762,7 @@ class BidsActions(QWidget):
 
     def rename_seq(self):
         """
-        
+        Rename a sequence
 
         Returns
         -------
@@ -770,7 +778,7 @@ class BidsActions(QWidget):
 
     def update_authors(self):
         """
-        
+        Update the authors of the Database
 
         Returns
         -------
@@ -786,12 +794,13 @@ class BidsActions(QWidget):
         
     def setEnabledButtons(self, enabled):
         """
-        
+        Enable or Disable all the buttons to avoid concurrent actions on the 
+        database
 
         Parameters
         ----------
-        enabled : TYPE
-            DESCRIPTION.
+        enabled : boolean
+            True to enable and False to disable the buttons
 
         Returns
         -------
