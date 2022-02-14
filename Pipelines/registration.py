@@ -237,6 +237,8 @@ class RegistrationTab(QWidget):
 
         """
         path_to_image_to_register = QFileDialog.getOpenFileName(self, "Select image to register", self.bids.root_dir)[0]
+        if path_to_image_to_register == '':
+            return
         path_to_image = path_to_image_to_register.split('/')
         # find sequence
         all_sequence = path_to_image[-1]
@@ -259,6 +261,8 @@ class RegistrationTab(QWidget):
 
         """
         path_to_ref_image = QFileDialog.getOpenFileName(self, "Select reference image", self.bids.root_dir)[0]
+        if path_to_ref_image == '':
+            return
         path_to_image = path_to_ref_image.split('/')
         # find sequence
         all_sequence = path_to_image[-1]
@@ -542,6 +546,8 @@ class TransformationTab(QWidget):
 
         """
         path_to_image_to_register = QFileDialog.getOpenFileName(self, "Select image to register", self.bids.root_dir)[0]
+        if path_to_image_to_register == '':
+            return
         path_to_image = path_to_image_to_register.split('/')
         # find sequence
         all_sequence = path_to_image[-1]
@@ -564,6 +570,8 @@ class TransformationTab(QWidget):
 
         """
         path_to_ref_image = QFileDialog.getOpenFileName(self, "Select reference image", self.bids.root_dir)[0]
+        if path_to_ref_image == '':
+            return
         path_to_image = path_to_ref_image.split('/')
         # find sequence
         all_sequence = path_to_image[-1]
@@ -586,6 +594,8 @@ class TransformationTab(QWidget):
 
         """
         path_to_trans_matrix = QFileDialog.getOpenFileName(self, "Select transformation matrix", self.bids.root_dir)[0]
+        if path_to_trans_matrix == '':
+            return
         path_to_image = path_to_trans_matrix.split('/')
         # find sequence
         all_sequence = path_to_image[-1]
