@@ -7,7 +7,7 @@ Created on Wed Nov 10 14:25:40 2021
 BIDS MANAGER GUI
 """
 
-import output_redirection_tools # KEEP ME !!!
+# import output_redirection_tools # KEEP ME !!!
 
 import time
 import sys
@@ -26,7 +26,10 @@ from PyQt5.QtCore import (QSize,
                           pyqtSlot,
                           QRunnable, 
                           QThreadPool, 
-                          QProcess)
+                          QProcess, 
+                          QAbstractTableModel, 
+                          pyqtProperty, 
+                          QVariant)
 from PyQt5.QtWidgets import (QDesktopWidget, 
                              QApplication, 
                              QWidget, 
@@ -48,22 +51,35 @@ from PyQt5.QtWidgets import (QDesktopWidget,
                              QTableWidget, 
                              QTableWidgetItem, 
                              QMenu, 
-                             QAction)
+                             QAction, 
+                             QTableView, 
+                             QAbstractScrollArea,
+                             QTabWidget)
 from PyQt5.QtGui import (QFont, 
                          QIcon, 
-                         QTextCursor)
+                         QTextCursor,
+                         QPixmap, 
+                         QColor)
+from matplotlib.figure import Figure
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_qt5agg import (
+    FigureCanvasQTAgg as FigureCanvas,
+    NavigationToolbar2QT as NavigationToolbar)
 import traceback
 import threading
 import subprocess
 import pandas as pd
 import platform
+import nibabel as nib
+import numpy as np
 import json
 from bids_validator import BIDSValidator
 import faulthandler
+import zipfile
 
-from config import config_dict, STDOUT_WRITE_STREAM_CONFIG, TQDM_WRITE_STREAM_CONFIG, STREAM_CONFIG_KEY_QUEUE, \
-    STREAM_CONFIG_KEY_QT_QUEUE_RECEIVER
-from my_logging import setup_logging
+# from config import config_dict, STDOUT_WRITE_STREAM_CONFIG, TQDM_WRITE_STREAM_CONFIG, STREAM_CONFIG_KEY_QUEUE, \
+#     STREAM_CONFIG_KEY_QT_QUEUE_RECEIVER
+# from my_logging import setup_logging
 
 faulthandler.enable()
 
@@ -115,6 +131,32 @@ class MainWindow(QMainWindow):
 
         # Create menu bar and add action
         self.menu_bar = self.menuBar()
+        self.bids_menu = self.menu_bar.addMenu('&BIDS')
+        
+        create_bids = QAction('&Create BIDS directory', self)
+        create_bids.triggered.connect(self.create_bids_directory)
+        self.bids_menu.addAction(create_bids)
+        
+        change_bids = QAction('&Change BIDS directory', self)
+        change_bids.triggered.connect(self.change_bids_directory)
+        self.bids_menu.addAction(change_bids)
+        
+        bids_quality = QAction('&BIDS Quality Control', self)
+        bids_quality.triggered.connect(self.control_bids_quality)
+        self.bids_menu.addAction(bids_quality)
+        
+        update_authors = QAction('&Update Authors', self)
+        update_authors.triggered.connect(self.update_authors_of_bids_directory)
+        self.bids_menu.addAction(update_authors)
+        
+        add_password = QAction('&Add Password', self)
+        add_password.triggered.connect(self.add_password_to_bids)
+        self.bids_menu.addAction(add_password)
+        
+        remove_password = QAction('&Remove Password', self)
+        remove_password.triggered.connect(self.remove_password_to_bids)
+        self.bids_menu.addAction(remove_password)
+        
         self.PipelinesMenu = self.menu_bar.addMenu('&Pipelines')
 
         for pipe in self.pipelines_name:
@@ -136,8 +178,8 @@ class MainWindow(QMainWindow):
         None.
 
         """
-        self.setWindowTitle('BIDS Manager')
-        self.setWindowIcon(QIcon('bids_icon.png'))
+        self.setWindowTitle('BMAT')
+        self.setWindowIcon(QIcon(pjoin('Pictures', 'bids_icon.png')))
         self.window = QWidget(self)
         self.setCentralWidget(self.window)
         self.window.closeEvent = self.closeEvent
@@ -150,7 +192,7 @@ class MainWindow(QMainWindow):
 
         self.dcm2niix_path = self.memory.get('dcm2niix_path')
 
-        self.bids = BIDSHandler(root_dir=self.bids_dir, dicom2niix_path=self.dcm2niix_path)
+        self.bids = BIDSHandler(root_dir=self.bids_dir)
         bids_dir_split = self.bids_dir.split('/')
         self.bids_name = bids_dir_split[len(bids_dir_split)-1]
         self.bids_lab = QLabel(self.bids_name)
@@ -162,41 +204,48 @@ class MainWindow(QMainWindow):
 
         self.bids_actions = BidsActions(self)
 
-        setup_logging(self.__class__.__name__)
+        # setup_logging(self.__class__.__name__)
 
-        self.__logger = logging.getLogger(self.__class__.__name__)
-        self.__logger.setLevel(logging.DEBUG)
+        # self.__logger = logging.getLogger(self.__class__.__name__)
+        # self.__logger.setLevel(logging.DEBUG)
 
-        self.queue_std_out = config_dict[STDOUT_WRITE_STREAM_CONFIG][STREAM_CONFIG_KEY_QUEUE]
+        # self.queue_std_out = config_dict[STDOUT_WRITE_STREAM_CONFIG][STREAM_CONFIG_KEY_QUEUE]
  
-        self.text_edit_std_out = StdOutTextEdit(self)
+        # self.text_edit_std_out = StdOutTextEdit(self)
         
-        # std out stream management
-        # create console text read thread + receiver object
-        self.thread_std_out_queue_listener = QThread()
-        self.std_out_text_receiver = config_dict[STDOUT_WRITE_STREAM_CONFIG][STREAM_CONFIG_KEY_QT_QUEUE_RECEIVER]
-        # connect receiver object to widget for text update
-        self.std_out_text_receiver.queue_std_out_element_received_signal.connect(self.text_edit_std_out.append_text)
-        # attach console text receiver to console text thread
-        self.std_out_text_receiver.moveToThread(self.thread_std_out_queue_listener)
-        # attach to start / stop methods
-        self.std_out_text_receiver.finished.connect(self.std_out_text_receiver.deleteLater)
-        self.thread_std_out_queue_listener.started.connect(self.std_out_text_receiver.run)
-        self.thread_std_out_queue_listener.finished.connect(self.thread_std_out_queue_listener.deleteLater)
-        self.thread_std_out_queue_listener.start()
+        # # std out stream management
+        # # create console text read thread + receiver object
+        # self.thread_std_out_queue_listener = QThread()
+        # self.std_out_text_receiver = config_dict[STDOUT_WRITE_STREAM_CONFIG][STREAM_CONFIG_KEY_QT_QUEUE_RECEIVER]
+        # # connect receiver object to widget for text update
+        # self.std_out_text_receiver.queue_std_out_element_received_signal.connect(self.text_edit_std_out.append_text)
+        # # attach console text receiver to console text thread
+        # self.std_out_text_receiver.moveToThread(self.thread_std_out_queue_listener)
+        # # attach to start / stop methods
+        # self.std_out_text_receiver.finished.connect(self.std_out_text_receiver.deleteLater)
+        # self.thread_std_out_queue_listener.started.connect(self.std_out_text_receiver.run)
+        # self.thread_std_out_queue_listener.finished.connect(self.thread_std_out_queue_listener.deleteLater)
+        # self.thread_std_out_queue_listener.start()
+        
+        # self.excel_viewer = ExcelViewer(self)        
+        # self.text_viewer = TextViewer(self)
+        # self.default_viewer = DefaultViewer(self)
+        # self.nifti_viewer = DefaultNiftiViewer(self)
+        
+        self.viewer = DefaultViewer(self)
 
         validator = BIDSValidator()
         if not validator.is_bids(self.bids_dir):
             logging.warning('/!\ Directory is not considered as a valid BIDS directory !!!')
 
-        layout = QGridLayout()
-        layout.addWidget(self.bids_lab, 0, 1, 1, 2)
-        layout.addWidget(self.bids_dir_view, 0, 0, 3, 1)
-        layout.addWidget(self.bids_metadata, 1, 1)
-        layout.addWidget(self.bids_actions, 1, 2)
-        layout.addWidget(self.text_edit_std_out, 2, 1, 1, 2)
+        self.layout = QGridLayout()
+        self.layout.addWidget(self.bids_lab, 0, 1, 1, 2)
+        self.layout.addWidget(self.bids_dir_view, 0, 0, 3, 1)
+        self.layout.addWidget(self.bids_metadata, 1, 1)
+        self.layout.addWidget(self.bids_actions, 1, 2)
+        self.layout.addWidget(self.viewer, 2, 1, 1, 2)
 
-        self.window.setLayout(layout)
+        self.window.setLayout(self.layout)
 
         self.center()
 
@@ -233,11 +282,11 @@ class MainWindow(QMainWindow):
         """
         memory_df = pd.DataFrame(self.memory, index=[0])
         memory_df.to_pickle('memory.xz')
-        logging.info('Stop Listener')
-        self.std_out_text_receiver.deleteLater()
-        self.std_out_text_receiver.stop()
-        self.thread_std_out_queue_listener.quit()
-        self.thread_std_out_queue_listener.wait()
+        # logging.info('Stop Listener')
+        # self.std_out_text_receiver.deleteLater()
+        # self.std_out_text_receiver.stop()
+        # self.thread_std_out_queue_listener.quit()
+        # self.thread_std_out_queue_listener.wait()
         
     
     def close(self):
@@ -252,50 +301,47 @@ class MainWindow(QMainWindow):
         """
         memory_df = pd.DataFrame(self.memory, index=[0])
         memory_df.to_pickle('memory.xz')
-        logging.info('Stop Listener')
-        self.std_out_text_receiver.deleteLater()
-        self.std_out_text_receiver.stop()
-        self.thread_std_out_queue_listener.quit()
-        self.thread_std_out_queue_listener.wait()
+        # logging.info('Stop Listener')
+        # self.std_out_text_receiver.deleteLater()
+        # self.std_out_text_receiver.stop()
+        # self.thread_std_out_queue_listener.quit()
+        # self.thread_std_out_queue_listener.wait()
         
 
     def update_bids(self):
-        """
-        Update the GUI when the bids database has been modified
-
-        Returns
-        -------
-        None.
-
-        """
-        logging.info("update_bids!")
-
-        bids_dir = str(QFileDialog.getExistingDirectory(self, "Select BIDS Directory"))
-        if os.path.isdir(bids_dir):
-            self.bids_dir = bids_dir
-            self.bids = BIDSHandler(root_dir=self.bids_dir, dicom2niix_path="dcm2niix")
-            bids_dir_split = self.bids_dir.split('/')
-            self.bids_name = bids_dir_split[len(bids_dir_split)-1]
-            self.bids_lab = QLabel(self.bids_name)
-            self.bids_lab.setFont(QFont('Calibri', 30))
-
-            self.bids_dir_view = BidsDirView(self)
-
-            self.bids_metadata = BidsMetadata(self)
-
-            self.bids_actions.update_bids(self)
-
-            layout = QGridLayout()
-            layout.addWidget(self.bids_lab, 0, 1, 1, 2)
-            layout.addWidget(self.bids_dir_view, 0, 0, 3, 1)
-            layout.addWidget(self.bids_metadata, 1, 1)
-            layout.addWidget(self.bids_actions, 1, 2)
-            layout.addWidget(self.text_edit_std_out, 2, 1, 1, 2)
-            self.window = QWidget(self)
-            self.setCentralWidget(self.window)
-            self.window.setLayout(layout)
+        pass
+        
+    
+    def updateViewer(self, viewer, file=''):
+        self.layout.removeWidget(self.viewer)
+        self.viewer.deleteLater()
+        if viewer == 'excel':
+            self.viewer = ExcelViewer(self)
+            self.viewer.viewExcel(file)
+        elif viewer == 'text':
+            self.viewer = TextViewer(self)
+            self.viewer.viewText(file)
+        elif viewer == 'nifti':
+            self.viewer = DefaultNiftiViewer(self)
+            self.viewer.viewNifti(file)
         else:
-            pass
+            self.viewer = DefaultViewer(self)
+            self.viewer.setLabel(file)
+            
+        self.layout.deleteLater()
+        self.window.deleteLater()
+
+        self.layout = QGridLayout()
+        self.layout.addWidget(self.bids_lab, 0, 1, 1, 2)
+        self.layout.addWidget(self.bids_dir_view, 0, 0, 3, 1)
+        self.layout.addWidget(self.bids_metadata, 1, 1)
+        self.layout.addWidget(self.bids_actions, 1, 2)
+        self.layout.addWidget(self.viewer, 2, 1, 1, 2)
+        self.window = QWidget(self)
+        self.setCentralWidget(self.window)
+        self.window.setLayout(self.layout)
+        self.window.setLayout(self.layout)
+        
         
 
     def launch_pipeline(self, pipe):
@@ -314,6 +360,328 @@ class MainWindow(QMainWindow):
         """
         self.pipelines[pipe]['import'].launch(self)
         
+        
+    def create_bids_directory(self):
+        logging.info("update_bids!")
+
+        bids_dir = str(QFileDialog.getExistingDirectory(self, "Create new BIDS Directory"))
+        if os.path.isdir(bids_dir):
+            self.bids_dir = bids_dir
+            self.bids = BIDSHandler(root_dir=self.bids_dir)
+            bids_dir_split = self.bids_dir.split('/')
+            self.bids_name = bids_dir_split[len(bids_dir_split)-1]
+            self.bids_lab = QLabel(self.bids_name)
+            self.bids_lab.setFont(QFont('Calibri', 30))
+
+            self.bids_dir_view = BidsDirView(self)
+
+            self.bids_metadata = BidsMetadata(self)
+
+            self.bids_actions.update_bids(self)
+            
+            self.viewer = DefaultViewer(self)
+            
+            self.layout.deleteLater()
+            self.window.deleteLater()
+            
+            self.layout = QGridLayout()
+            self.layout.addWidget(self.bids_lab, 0, 1, 1, 2)
+            self.layout.addWidget(self.bids_dir_view, 0, 0, 3, 1)
+            self.layout.addWidget(self.bids_metadata, 1, 1)
+            self.layout.addWidget(self.bids_actions, 1, 2)
+            self.layout.addWidget(self.viewer, 2, 1, 1, 2)
+            self.window = QWidget(self)
+            self.setCentralWidget(self.window)
+            self.window.setLayout(self.layout)
+        else:
+            pass
+    
+    
+    def change_bids_directory(self):
+        """
+        Update the GUI when the bids database has been modified
+
+        Returns
+        -------
+        None.
+
+        """
+        logging.info("update_bids!")
+
+        bids_dir = str(QFileDialog.getExistingDirectory(self, "Select BIDS Directory"))
+        if os.path.isdir(bids_dir):
+            self.bids_dir = bids_dir
+            self.bids = BIDSHandler(root_dir=self.bids_dir)
+            bids_dir_split = self.bids_dir.split('/')
+            self.bids_name = bids_dir_split[len(bids_dir_split)-1]
+            self.bids_lab = QLabel(self.bids_name)
+            self.bids_lab.setFont(QFont('Calibri', 30))
+
+            self.bids_dir_view = BidsDirView(self)
+
+            self.bids_metadata = BidsMetadata(self)
+
+            self.bids_actions.update_bids(self)
+            
+            self.viewer = DefaultViewer(self)
+            
+            self.layout.deleteLater()
+            self.window.deleteLater()
+            
+            self.layout = QGridLayout()
+            self.layout.addWidget(self.bids_lab, 0, 1, 1, 2)
+            self.layout.addWidget(self.bids_dir_view, 0, 0, 3, 1)
+            self.layout.addWidget(self.bids_metadata, 1, 1)
+            self.layout.addWidget(self.bids_actions, 1, 2)
+            self.layout.addWidget(self.viewer, 2, 1, 1, 2)
+            self.window = QWidget(self)
+            self.setCentralWidget(self.window)
+            self.window.setLayout(self.layout)
+        else:
+            pass
+        
+        
+    def control_bids_quality(self):
+        
+        subprocess.Popen(f'docker run --rm -v {self.bids_dir}:/data:ro bids/validator /data --json > bids_validator.json', shell=True).wait()
+        with open('bids_validator.json', 'r') as bv:
+            bids_validator = json.load(bv)
+            bv.close()
+        issues = bids_validator.get('issues')
+        errors = issues.get('errors')
+        warnings = issues.get('warnings')
+        
+        self.bids_quality_controler = BIDSQualityControlWindow(self, errors, warnings)
+        self.bids_quality_controler.show()
+        
+    
+    def update_authors_of_bids_directory(self):
+        """
+        Update the authors of the Database
+
+        Returns
+        -------
+        None.
+
+        """
+        logging.info("update_authors")
+        if hasattr(self, 'updateAuthors_win'):
+            del self.updateAuthors_win
+        self.updateAuthors_win = UpdateAuthors(self)
+        self.updateAuthors_win.show()
+    
+    
+    def add_password_to_bids(self):
+        pass
+    
+    
+    def remove_password_to_bids(self):
+        pass
+        
+
+
+# =============================================================================
+# BIDSQualityControlWindow
+# =============================================================================
+class BIDSQualityControlWindow(QMainWindow):
+    """
+    """
+    
+
+    def __init__(self, parent, errors, warnings):
+        """
+        
+
+        Parameters
+        ----------
+        parent : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
+        super().__init__()
+        self.parent = parent
+        self.bids = self.parent.bids
+        self.threads_pool = self.parent.threads_pool
+
+        self.setWindowTitle("BIDS Quality Controler")
+        
+        self.title = QLabel('BIDS Quality Controler')
+        self.title.setFont(QFont('Calibri', 30))
+        
+        self.errors = errors
+        
+        self.warnings = warnings
+        
+        self.info_label = QLabel('Useful Resources')
+        self.info_label.setFont(QFont('Calibri', 15))
+        self.specification_label = QLabel(f'\tBIDS specification: https://bids-specification.readthedocs.io/en/stable/')
+        self.specification_label.setFont(QFont('Calibri', 15))
+        
+        self.init_ui()
+        
+        self.center()
+        
+        
+    def init_ui(self):
+        self.window = QWidget(self)
+        self.setCentralWidget(self.window)
+        
+        self.errors_label = QLabel(f'Your BIDS directory contains {len(self.errors)} Errors !')
+        self.errors_label.setFont(QFont('Calibri', 15))
+        self.errors_label.setStyleSheet("color:red")
+        self.errors_details_button = QPushButton('Details')
+        self.errors_details_button.setIcon(QIcon(pjoin('Pictures', 'plus.png')))
+        self.errors_details_button.clicked.connect(self.errors_details)
+        
+        self.warnings_label = QLabel(f'Your BIDS directory contains {len(self.warnings)} Warnings !')
+        self.warnings_label.setFont(QFont('Calibri', 15))
+        self.warnings_label.setStyleSheet("color:orange")
+        self.warnings_details_button = QPushButton('Details')
+        self.warnings_details_button.setIcon(QIcon(pjoin('Pictures', 'plus.png')))
+        self.warnings_details_button.clicked.connect(self.warnings_details)
+        
+        self.layout = QGridLayout()
+        self.layout.addWidget(self.title, 0, 0, 1, 2, Qt.AlignCenter)
+        self.layout.addWidget(self.errors_label, 1, 0, 1, 1)
+        self.layout.addWidget(self.errors_details_button, 1, 1, 1, 1)
+        self.layout.addWidget(self.warnings_label, 2, 0, 1, 1)
+        self.layout.addWidget(self.warnings_details_button, 2, 1, 1, 1)
+        self.layout.addWidget(self.info_label, 3, 0, 1, 2)
+        self.layout.addWidget(self.specification_label, 4, 0, 1, 2)
+
+        self.window.setLayout(self.layout)
+        self.window.adjustSize()
+        self.setCentralWidget(self.window)
+        # self.centralWidget.adjustSize()
+        self.adjustSize()
+
+    
+    def errors_details(self):
+        
+        self.details_errors = QTextEdit()
+        self.details_errors.setReadOnly(True)
+        self.details_errors.setMinimumHeight(400)
+        
+        self.warnings_label = QLabel(f'Your BIDS directory contains {len(self.warnings)} Warnings !')
+        self.warnings_label.setFont(QFont('Calibri', 15))
+        self.warnings_label.setStyleSheet("color:orange")
+        self.warnings_details_button = QPushButton('Details')
+        self.warnings_details_button.setIcon(QIcon(pjoin('Pictures', 'plus.png')))
+        self.warnings_details_button.clicked.connect(self.warnings_details)
+        
+        self.minus_errors_button = QPushButton()
+        self.minus_errors_button.setIcon(QIcon(pjoin('Pictures', 'minus.png')))
+        self.minus_errors_button.clicked.connect(self.init_ui)
+        
+        for error in self.errors:
+            self.details_errors.setFontWeight(QFont.Bold)
+            self.details_errors.setTextColor(QColor(255,0,0))
+            self.details_errors.insertPlainText(f"{error.get('key')}: \n")
+            self.details_errors.setTextColor(QColor(0,0,0))
+            self.details_errors.insertPlainText(f'\tReason:\n')
+            self.details_errors.setFontWeight(QFont.Normal)
+            self.details_errors.insertPlainText(f"\t\t{error.get('reason')}\n")
+            self.details_errors.setFontWeight(QFont.Bold)
+            self.details_errors.insertPlainText(f'\tFiles:\n')
+            self.details_errors.setFontWeight(QFont.Normal)
+            for file in error.get('files'):
+                self.details_errors.insertPlainText(f"\t\t{file.get('file').get('name')}\n")
+        
+        self.layout.deleteLater()
+        self.window.deleteLater()
+        
+        self.layout = QGridLayout()
+        self.layout.addWidget(self.title, 0, 0, 1, 2, Qt.AlignCenter)
+        self.layout.addWidget(self.errors_label, 1, 0, 1, 1)
+        self.layout.addWidget(self.minus_errors_button, 1, 1, 1, 1)
+        self.layout.addWidget(self.details_errors, 2, 0, 1, 2)
+        self.layout.addWidget(self.warnings_label, 3, 0, 1, 1)
+        self.layout.addWidget(self.warnings_details_button, 3, 1, 1, 1)
+        self.layout.addWidget(self.info_label, 4, 0, 1, 2)
+        self.layout.addWidget(self.specification_label, 5, 0, 1, 2)
+        
+        self.window = QWidget(self)
+        self.window.setLayout(self.layout)
+        self.window.adjustSize()
+        self.setCentralWidget(self.window)
+        # self.centralWidget.adjustSize()
+        self.adjustSize()
+                
+    
+    def warnings_details(self):
+        
+        self.details_warnings = QTextEdit()
+        self.details_warnings.setReadOnly(True)
+        self.details_warnings.setMinimumHeight(400)
+        
+        self.errors_label = QLabel(f'Your BIDS directory contains {len(self.errors)} Errors !')
+        self.errors_label.setFont(QFont('Calibri', 15))
+        self.errors_label.setStyleSheet("color:red")
+        self.errors_details_button = QPushButton('Details')
+        self.errors_details_button.setIcon(QIcon(pjoin('Pictures', 'plus.png')))
+        self.errors_details_button.clicked.connect(self.errors_details)
+        
+        self.minus_warnings_button = QPushButton()
+        self.minus_warnings_button.setIcon(QIcon(pjoin('Pictures', 'minus.png')))
+        self.minus_warnings_button.clicked.connect(self.init_ui)
+        
+        for warning in self.warnings:
+            self.details_warnings.setFontWeight(QFont.Bold)
+            self.details_warnings.setTextColor(QColor(255,165,0))
+            self.details_warnings.insertPlainText(f"{warning.get('key')}: \n")
+            self.details_warnings.setTextColor(QColor(0,0,0))
+            self.details_warnings.insertPlainText(f'\tReason:\n')
+            self.details_warnings.setFontWeight(QFont.Normal)
+            self.details_warnings.insertPlainText(f"\t\t{warning.get('reason')}\n")
+            self.details_warnings.setFontWeight(QFont.Bold)
+            self.details_warnings.insertPlainText(f'\tFiles:\n')
+            self.details_warnings.setFontWeight(QFont.Normal)
+            for file in warning.get('files'):
+                if file.get('file') != None:
+                    self.details_warnings.insertPlainText(f"\t\t{file.get('file').get('name')}\n")  
+                else:
+                    self.details_warnings.insertPlainText(f"\t\t{file.get('reason')}\n")  
+                
+        self.layout.deleteLater()
+        self.window.deleteLater()
+        
+        self.layout = QGridLayout()
+        self.layout.addWidget(self.title, 0, 0, 1, 2, Qt.AlignCenter)
+        self.layout.addWidget(self.errors_label, 1, 0, 1, 1)
+        self.layout.addWidget(self.errors_details_button, 1, 1, 1, 1)
+        self.layout.addWidget(self.warnings_label, 2, 0, 1, 1)
+        self.layout.addWidget(self.minus_warnings_button, 2, 1, 1, 1)
+        self.layout.addWidget(self.details_warnings, 3, 0, 1, 2)
+        self.layout.addWidget(self.info_label, 4, 0, 1, 2)
+        self.layout.addWidget(self.specification_label, 5, 0, 1, 2)
+        
+        self.window = QWidget(self)
+        self.window.setLayout(self.layout)
+        self.window.adjustSize()
+        self.setCentralWidget(self.window)
+        # self.centralWidget.adjustSize()
+        self.adjustSize()    
+        
+
+    def center(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
+        qr = self.frameGeometry()
+        cp = QDesktopWidget().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.move(qr.topLeft())
+        
+
 
 
 # =============================================================================
@@ -355,10 +723,13 @@ class BidsDirView(QWidget):
         self.tree.setColumnWidth(0,250)
         self.tree.setAlternatingRowColors(True)
         self.tree.doubleClicked.connect(self.treeMedia_doubleClicked)
+        self.tree.clicked.connect(self.treeMedia_clicked)
         self.tree.setDragEnabled(True)
         self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tree.customContextMenuRequested.connect(self.openMenu)
         self.threads = []
+        
+        self.single_click = True
         
         self.itksnap = None
 
@@ -396,56 +767,94 @@ class BidsDirView(QWidget):
         None.
 
         """
+        # item = self.tree.selectedIndexes()[0]
+        # item_path = item.model().filePath(index)
+        # if os.path.isfile(item_path):
+        #     logging.info(f"[INFO] Opening {item_path}")
+        #     if '.nii' in item_path:
+        #         self.itksnap = self.parent.memory.get('itksnap')
+        #         if self.itksnap == None:
+        #             logging.info(f'No application selected open MRI \n \t Please select itksnap path')
+        #         else:
+        #             print(self.itksnap)
+        #             self.threads.append(QThread())
+        #             self.operation = SubprocessWorker(f'{self.itksnap} -g {item_path}')
+        #             self.operation.moveToThread(self.threads[-1])
+        #             self.threads[-1].started.connect(self.operation.run)
+        #             self.operation.finished.connect(self.threads[-1].quit)
+        #             self.operation.finished.connect(self.operation.deleteLater)
+        #             self.threads[-1].finished.connect(self.threads[-1].deleteLater)
+        #             self.threads[-1].start()
+        #     else:
+        #         if self.parent.system == 'Linux':
+        #             self.threads.append(QThread())
+        #             self.operation = SubprocessWorker(f'xdg-open {item_path}')
+        #             self.operation.moveToThread(self.threads[-1])
+        #             self.threads[-1].started.connect(self.operation.run)
+        #             self.operation.finished.connect(self.threads[-1].quit)
+        #             self.operation.finished.connect(self.operation.deleteLater)
+        #             self.threads[-1].finished.connect(self.threads[-1].deleteLater)
+        #             self.threads[-1].start()
+        #         elif self.parent.system == 'Darwin':
+        #             self.threads.append(QThread())
+        #             self.operation = SubprocessWorker(f'open {item_path}')
+        #             self.operation.moveToThread(self.threads[-1])
+        #             self.threads[-1].started.connect(self.operation.run)
+        #             self.operation.finished.connect(self.threads[-1].quit)
+        #             self.operation.finished.connect(self.operation.deleteLater)
+        #             self.threads[-1].finished.connect(self.threads[-1].deleteLater)
+        #             self.threads[-1].start()
+        #         elif self.parent.system == 'Windows':
+        #             self.threads.append(QThread())
+        #             self.operation = SubprocessWorker(f'start {item_path}')
+        #             self.operation.moveToThread(self.threads[-1])
+        #             self.threads[-1].started.connect(self.operation.run)
+        #             self.operation.finished.connect(self.threads[-1].quit)
+        #             self.operation.finished.connect(self.operation.deleteLater)
+        #             self.threads[-1].finished.connect(self.threads[-1].deleteLater)
+        #             self.threads[-1].start()
+        #         else:
+        #             logging.warning('The program does not recognize the OS')
+        # else:
+        #     pass
         item = self.tree.selectedIndexes()[0]
         item_path = item.model().filePath(index)
-        if os.path.isfile(item_path):
-            logging.info(f"[INFO] Opening {item_path}")
-            if '.nii' in item_path:
-                self.itksnap = self.parent.memory.get('itksnap')
-                if self.itksnap == None:
-                    logging.info(f'No application selected open MRI \n \t Please select itksnap path')
-                else:
-                    print(self.itksnap)
-                    self.threads.append(QThread())
-                    self.operation = SubprocessWorker(f'{self.itksnap} -g {item_path}')
-                    self.operation.moveToThread(self.threads[-1])
-                    self.threads[-1].started.connect(self.operation.run)
-                    self.operation.finished.connect(self.threads[-1].quit)
-                    self.operation.finished.connect(self.operation.deleteLater)
-                    self.threads[-1].finished.connect(self.threads[-1].deleteLater)
-                    self.threads[-1].start()
+        if os.path.isdir(pjoin(item_path)):
+            return
+        if any(['.csv' in item_path, '.tsv' in item_path, '.xlsx' in item_path]):
+            self.parent.updateViewer('excel', file=item_path)
+        elif any(['.nii' in item_path, '.nii.gz' in item_path]):
+            self.itksnap = self.parent.memory.get('itksnap')
+            if self.itksnap == None:
+                pass
             else:
-                if self.parent.system == 'Linux':
-                    self.threads.append(QThread())
-                    self.operation = SubprocessWorker(f'xdg-open {item_path}')
-                    self.operation.moveToThread(self.threads[-1])
-                    self.threads[-1].started.connect(self.operation.run)
-                    self.operation.finished.connect(self.threads[-1].quit)
-                    self.operation.finished.connect(self.operation.deleteLater)
-                    self.threads[-1].finished.connect(self.threads[-1].deleteLater)
-                    self.threads[-1].start()
-                elif self.parent.system == 'Darwin':
-                    self.threads.append(QThread())
-                    self.operation = SubprocessWorker(f'open {item_path}')
-                    self.operation.moveToThread(self.threads[-1])
-                    self.threads[-1].started.connect(self.operation.run)
-                    self.operation.finished.connect(self.threads[-1].quit)
-                    self.operation.finished.connect(self.operation.deleteLater)
-                    self.threads[-1].finished.connect(self.threads[-1].deleteLater)
-                    self.threads[-1].start()
-                elif self.parent.system == 'Windows':
-                    self.threads.append(QThread())
-                    self.operation = SubprocessWorker(f'start {item_path}')
-                    self.operation.moveToThread(self.threads[-1])
-                    self.threads[-1].started.connect(self.operation.run)
-                    self.operation.finished.connect(self.threads[-1].quit)
-                    self.operation.finished.connect(self.operation.deleteLater)
-                    self.threads[-1].finished.connect(self.threads[-1].deleteLater)
-                    self.threads[-1].start()
-                else:
-                    logging.warning('The program does not recognize the OS')
+                print(self.itksnap)
+                self.threads.append(QThread())
+                self.operation = SubprocessWorker(f'{self.itksnap} -g {item_path}')
+                self.operation.moveToThread(self.threads[-1])
+                self.threads[-1].started.connect(self.operation.run)
+                self.operation.finished.connect(self.threads[-1].quit)
+                self.operation.finished.connect(self.operation.deleteLater)
+                self.threads[-1].finished.connect(self.threads[-1].deleteLater)
+                self.threads[-1].start()
         else:
-            pass
+            self.parent.updateViewer('text', file=item_path)
+            
+        self.single_click = False
+        
+        
+    def treeMedia_clicked(self, index):
+        if self.single_click:
+            item = self.tree.selectedIndexes()[0]
+            item_path = item.model().filePath(index)
+            if os.path.isdir(pjoin(item_path)):
+                return
+            if any(['.nii' in item_path, '.nii.gz' in item_path]):
+                self.parent.updateViewer('nifti', file=item_path)
+            else:
+                self.parent.updateViewer('default', file=item_path)
+        else:
+            self.single_click = True
         
 
     def openMenu(self, position):
@@ -626,8 +1035,8 @@ class BidsActions(QWidget):
         self.bids = self.parent.bids
         self.threads_pool = self.parent.threads_pool
 
-        self.change_bids_dir_button = QPushButton("Change BIDS Directory")
-        self.change_bids_dir_button.clicked.connect(self.change_bids_dir)
+        # self.change_bids_dir_button = QPushButton("Change BIDS Directory")
+        # self.change_bids_dir_button.clicked.connect(self.change_bids_dir)
 
         self.add_button = QPushButton("Add")
         self.add_button.clicked.connect(self.add)
@@ -635,26 +1044,30 @@ class BidsActions(QWidget):
         self.remove_button = QPushButton("Remove")
         self.remove_button.clicked.connect(self.remove)
 
-        self.rename_sub_button = QPushButton("Rename subject")
-        self.rename_sub_button.clicked.connect(self.rename_sub)
+        # self.rename_sub_button = QPushButton("Rename subject")
+        # self.rename_sub_button.clicked.connect(self.rename_sub)
 
-        self.rename_ses_button = QPushButton("Rename session")
-        self.rename_ses_button.clicked.connect(self.rename_ses)
+        # self.rename_ses_button = QPushButton("Rename session")
+        # self.rename_ses_button.clicked.connect(self.rename_ses)
 
-        self.rename_seq_button = QPushButton("Rename sequence")
-        self.rename_seq_button.clicked.connect(self.rename_seq)
+        # self.rename_seq_button = QPushButton("Rename sequence")
+        # self.rename_seq_button.clicked.connect(self.rename_seq)
 
-        self.update_authors_button = QPushButton("Update authors")
-        self.update_authors_button.clicked.connect(self.update_authors)
+        # self.update_authors_button = QPushButton("Update authors")
+        # self.update_authors_button.clicked.connect(self.update_authors)
+        
+        self.rename_button = QPushButton("Rename subject/session/sequence")
+        self.rename_button.clicked.connect(self.rename)
 
         layout = QGridLayout()
-        layout.addWidget(self.change_bids_dir_button, 0, 0, 1, 2)
-        layout.addWidget(self.add_button, 1, 0, 1, 1)
-        layout.addWidget(self.remove_button, 1, 1, 1, 1)
-        layout.addWidget(self.rename_sub_button, 2, 0, 1, 1)
-        layout.addWidget(self.rename_ses_button, 2, 1, 1, 1)
-        layout.addWidget(self.rename_seq_button, 3, 0, 1, 1)
-        layout.addWidget(self.update_authors_button, 3, 1, 1, 1)
+        # layout.addWidget(self.change_bids_dir_button, 0, 0, 1, 2)
+        layout.addWidget(self.add_button, 0, 0, 1, 1)
+        layout.addWidget(self.remove_button, 0, 1, 1, 1)
+        # layout.addWidget(self.rename_sub_button, 2, 0, 1, 1)
+        # layout.addWidget(self.rename_ses_button, 2, 1, 1, 1)
+        # layout.addWidget(self.rename_seq_button, 3, 0, 1, 1)
+        # layout.addWidget(self.update_authors_button, 3, 1, 1, 1)
+        layout.addWidget(self.rename_button, 1, 0, 1, 2)
 
         self.setLayout(layout)
         
@@ -724,6 +1137,22 @@ class BidsActions(QWidget):
             del self.renameSub_win
         self.renameSub_win = RenameSubject(self)
         self.renameSub_win.show()
+        
+    
+    def rename(self):
+        """
+        Rename subject
+
+        Returns
+        -------
+        None.
+
+        """
+        logging.info("rename")
+        if hasattr(self, 'rename_win'):
+            del self.rename_win
+        self.rename_win = Rename(self)
+        self.rename_win.show()
         
 
     def rename_ses(self):
@@ -1113,6 +1542,76 @@ class AddWindow(QMainWindow):
         self.move(qr.topLeft())
         
 
+# =============================================================================
+# Rename
+# =============================================================================
+class Rename(QMainWindow):
+    """
+    """
+    
+
+    def __init__(self, parent):
+        """
+        
+
+        Parameters
+        ----------
+        parent : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
+        super().__init__()
+        self.parent = parent
+        self.bids = self.parent.bids
+        self.threads_pool = self.parent.threads_pool
+        
+        self.setWindowTitle("Rename Subject/Session/Sequence")
+        self.window = QWidget(self)
+        self.setCentralWidget(self.window)
+        self.center()
+        
+        self.tabs = QTabWidget(self)
+        # Tab1
+        self.tab1 = RenameSubject(self)
+
+        # Tab 2
+        self.tab2 = RenameSession(self)
+        
+        # Tab 3
+        self.tab3 = RenameSequence(self)
+
+        self.tabs.addTab(self.tab1, "Subject")
+        self.tabs.addTab(self.tab2, "Session")
+        self.tabs.addTab(self.tab3, "Sequence")
+
+        # self.registration = TransformationTab(self)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.tabs)
+
+        self.window.setLayout(layout)
+        
+
+    def center(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
+        qr = self.frameGeometry()
+        cp = QDesktopWidget().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.move(qr.topLeft())
+        
+
+
 
 # =============================================================================
 # RenameSubject
@@ -1467,7 +1966,7 @@ class UpdateAuthors(QMainWindow):
         )
         self.thread.finished.connect(lambda: self.end_update())
         logging.info(f"Updating {authors} as BIDS directory authors")
-        self.parent.parent.bids_metadata.update_metadata()
+        self.parent.bids_metadata.update_metadata()
         
         self.hide()
         
@@ -1482,7 +1981,7 @@ class UpdateAuthors(QMainWindow):
 
         """
         logging.info('Thread ended')
-        self.parent.parent.bids_metadata.update_metadata()
+        self.parent.bids_metadata.update_metadata()
 
 
     def center(self):
@@ -1498,9 +1997,598 @@ class UpdateAuthors(QMainWindow):
         cp = QDesktopWidget().availableGeometry().center()
         qr.moveCenter(cp)
         self.move(qr.topLeft())
+ 
+    
+# =============================================================================
+# PandasModel
+# =============================================================================
+class PandasModel(QAbstractTableModel):
+    DtypeRole = Qt.UserRole + 1000
+    ValueRole = Qt.UserRole + 1001
+
+    def __init__(self, df=pd.DataFrame(), parent=None):
+        super(PandasModel, self).__init__(parent)
+        self._dataframe = df
+        self.editable = False
+
+    def setDataFrame(self, dataframe):
+        self.beginResetModel()
+        self._dataframe = dataframe.copy()
+        self.endResetModel()
+
+    def dataFrame(self):
+        return self._dataframe
+
+    dataFrame = pyqtProperty(pd.DataFrame, fget=dataFrame, fset=setDataFrame)
+
+    @pyqtSlot(int, Qt.Orientation, result=str)
+    def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.DisplayRole):
+        if role == Qt.DisplayRole:
+            if orientation == Qt.Horizontal:
+                return self._dataframe.columns[section]
+            else:
+                return str(self._dataframe.index[section])
+        return QVariant()
+
+    def rowCount(self, parent=QModelIndex()):
+        if parent.isValid():
+            return 0
+        return len(self._dataframe.index)
+
+    def columnCount(self, parent=QModelIndex()):
+        if parent.isValid():
+            return 0
+        return self._dataframe.columns.size
+
+    def data(self, index, role=Qt.DisplayRole):
+        if not index.isValid() or not (0 <= index.row() < self.rowCount() \
+            and 0 <= index.column() < self.columnCount()):
+            return QVariant()
+        row = self._dataframe.index[index.row()]
+        col = self._dataframe.columns[index.column()]
+        dt = self._dataframe[col].dtype
+
+        val = self._dataframe.iloc[row][col]
+        if role == Qt.DisplayRole:
+            return str(val)
+        elif role == PandasModel.ValueRole:
+            return val
+        if role == PandasModel.DtypeRole:
+            return dt
+        return QVariant()
+
+    def roleNames(self):
+        roles = {
+            Qt.DisplayRole: b'display',
+            PandasModel.DtypeRole: b'dtype',
+            PandasModel.ValueRole: b'value'
+        }
+        return roles
+    
+    def flags(self, index):
+        if self.editable:
+            return Qt.ItemIsSelectable|Qt.ItemIsEnabled|Qt.ItemIsEditable
+        else:
+            return Qt.ItemIsSelectable|Qt.ItemIsEnabled|Qt.ItemIsUserCheckable
+        
+    def setEditable(self, enable):
+        self.editable = enable
+    
+    def setData(self, index, value, role):
+        if value == '':
+            return False
+        if role == Qt.EditRole:
+            self._dataframe.iloc[index.row(),index.column()] = value
+            return True
+        
+    
+    
+# =============================================================================
+# Excel Viewer
+# =============================================================================
+class ExcelViewer(QWidget):
+    """
+    """
+
+
+    def __init__(self, parent):
+        """
+        
+
+        Parameters
+        ----------
+        parent : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
+        super().__init__()
+        self.parent = parent
+        self.bids = self.parent.bids
+        self.threads_pool = self.parent.threads_pool
+        self.setMinimumSize(700,300)
+        
+        self.label = QLabel()
+        self.label.setMinimumWidth(500)
+        self.label.setFont(QFont('Calibri', 15))
+        self.edit_button = QPushButton('Edit')
+        self.edit_button.setIcon(QIcon(pjoin('Pictures', 'edit.png')))
+        self.edit_button.adjustSize()
+        self.edit_button.clicked.connect(self.edit)
+        self.save_button = QPushButton('Save')
+        self.save_button.setIcon(QIcon(pjoin('Pictures', 'save.png')))
+        self.save_button.adjustSize()
+        self.save_button.clicked.connect(self.save)
+        self.plus_button = QPushButton('Add')
+        self.plus_button.setIcon(QIcon(pjoin('Pictures', 'plus.png')))
+        self.plus_button.adjustSize()
+        self.plus_button.clicked.connect(self.add_item)
+        self.close_button = QPushButton('Close')
+        self.close_button.setIcon(QIcon(pjoin('Pictures', 'close.png')))
+        self.close_button.adjustSize()
+        self.close_button.clicked.connect(self.close)
+        
+        self.table_viewer = QTableView(self)
+        # self.table_viewer.setOjectName('table_viewer')
+        
+        layout = QGridLayout()
+        layout.addWidget(self.label, 0, 0, 1, 1)
+        layout.addWidget(self.edit_button, 0, 1, 1, 1)
+        layout.addWidget(self.save_button, 0, 2, 1, 1)
+        layout.addWidget(self.plus_button, 0, 3, 1, 1)
+        layout.addWidget(self.close_button, 0, 4, 1, 1)
+        layout.addWidget(self.table_viewer, 1, 0, 1, 5)
+        
+        self.setLayout(layout)
+        
+    def viewExcel(self, excel_file):
+        self.excel_file = pjoin(excel_file)
+        self.label.setText(os.path.split(pjoin(excel_file))[1])
+        if '.xlsx' in excel_file:
+            data = pd.read_excel(excel_file)
+        elif '.tsv' in excel_file:
+            data = pd.read_csv(excel_file, sep='\t')
+        elif '.csv' in excel_file:
+            data = pd.read_csv(excel_file)
+        else:
+            data = pd.DataFrame()
+            
+        data.fillna('n/a', inplace=True)
+            
+        self.model = PandasModel(data)
+        self.table_viewer.setModel(self.model)      
+        self.table_viewer.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
+        self.table_viewer.resizeColumnsToContents()
+        
+    
+    def edit(self):
+        mode = self.edit_button.text()
+        if mode == 'Edit':
+            reply = QMessageBox.question(self, 'Edit?', 'Are you sure you want to edit?', QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                self.model.setEditable(True)
+                self.edit_button.setText('Stop Editing')
+            else:
+                return
+            
+        elif mode == 'Stop Editing':
+            self.model.setEditable(False)
+            self.edit_button.setText('Edit')
+        else:
+            pass
+    
+    
+    def save(self):
+        data = self.model._dataframe
+        if '.xlsx' in self.excel_file:
+            data.to_excel(self.excel_file, index=False)
+        elif '.tsv' in self.excel_file:
+            data.to_csv(self.excel_file, sep='\t', index=False)
+        elif '.csv' in self.excel_file:
+            data = to_csv(self.excel_file, index=False)
+        else:
+            pass
         
         
-     
+    def clean(self):
+        self.label.setText('')
+        self.model = PandasModel(pd.DataFrame())
+        self.table_viewer.setModel(self.model)      
+        self.table_viewer.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
+        self.table_viewer.resizeColumnsToContents()
+    
+    
+    def close(self):
+        self.parent.updateViewer('default')
+        
+        
+    def add_item(self):
+        print("add_item")
+        if hasattr(self, 'addWindow'):
+            self.addWindow.deleteLater()
+        self.addWindow = ExcelViewer_AddItem(self)
+        self.addWindow.show()
+        
+        
+    def center(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
+        qr = self.frameGeometry()
+        cp = QDesktopWidget().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.move(qr.topLeft())      
+        
+
+
+# =============================================================================
+# ExcelViewer_AddItem
+# =============================================================================
+class ExcelViewer_AddItem(QMainWindow):
+    """
+    """
+
+
+    def __init__(self, parent):
+        """
+        
+
+        Parameters
+        ----------
+        parent : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
+        super().__init__()
+        self.parent = parent
+        self.bids = self.parent.bids
+        self.threads_pool = self.parent.threads_pool
+
+        self.setWindowTitle("Add item to participants.tsv")
+        self.window = QWidget(self)
+        self.setCentralWidget(self.window)
+        self.center()
+
+        self.name = QLineEdit(self)
+        self.name.setPlaceholderText("Name")
+        self.description = QLineEdit(self)
+        self.description.setPlaceholderText('Description')
+        self.dicom_tags = QLineEdit(self)
+        self.dicom_tags.setPlaceholderText('DICOM tags')
+        
+        self.add_item_button = QPushButton("Add")
+        self.add_item_button.clicked.connect(self.add_item)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.name)
+        layout.addWidget(self.description)
+        layout.addWidget(self.dicom_tags)
+        layout.addWidget(self.add_item_button)
+
+        self.window.setLayout(layout)
+        
+
+    def add_item(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
+        name = self.name.text()
+        description = self.description.text()
+        dicom_tags = self.dicom_tags.text()
+        dicom_tags = dicom_tags.split(',')
+        
+        new_item = {'name':name, 'infos':{'Description':description, 'dicom_tags':dicom_tags}}
+            
+        self.parent.setEnabled(False)
+        self.thread = QThread()
+        self.operation = OperationWorker(self.bids.update_participants_json, args=[new_item])
+        logging.debug('OperationWorker instanciated')
+        self.operation.moveToThread(self.thread)
+        logging.debug('OperationWorker moved to thread')
+        self.thread.started.connect(self.operation.run)
+        logging.debug('Thread started and launching operation.run')
+        self.operation.finished.connect(self.thread.quit)
+        self.operation.finished.connect(self.operation.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.thread.start()
+        self.thread.finished.connect(
+            lambda: self.parent.setEnabled(True)
+        )
+        # self.thread.finished.connect(lambda: self.end_update())
+        logging.info(f"Updating participants_json")
+        # self.parent.bids_metadata.update_metadata()
+        
+        self.hide()
+        
+
+    def center(self):
+        """
+        
+
+        Returns
+        -------
+        None.
+
+        """
+        qr = self.frameGeometry()
+        cp = QDesktopWidget().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.move(qr.topLeft())
+ 
+
+
+
+# =============================================================================
+# Text Viewer
+# =============================================================================
+class TextViewer(QWidget):
+    """
+    """
+
+
+    def __init__(self, parent):
+        """
+        
+
+        Parameters
+        ----------
+        parent : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
+        super().__init__()
+        self.parent = parent
+        self.bids = self.parent.bids
+        self.threads_pool = self.parent.threads_pool
+        self.setMinimumSize(700,300)
+        
+        self.label = QLabel()
+        self.label.setMinimumWidth(500)
+        self.label.setFont(QFont('Calibri', 15))
+        self.edit_button = QPushButton('Edit')
+        self.edit_button.setIcon(QIcon(pjoin('Pictures', 'edit.png')))
+        self.edit_button.adjustSize
+        self.edit_button.clicked.connect(self.edit)
+        self.save_button = QPushButton('Save')
+        self.save_button.setIcon(QIcon(pjoin('Pictures', 'save.png')))
+        self.save_button.adjustSize
+        self.save_button.clicked.connect(self.save)
+        self.close_button = QPushButton('Close')
+        self.close_button.setIcon(QIcon(pjoin('Pictures', 'close.png')))
+        self.close_button.adjustSize()
+        self.close_button.clicked.connect(self.close)
+        
+        self.text_viewer = QTextEdit(self)
+        self.text_viewer.setReadOnly(True)
+        # self.table_viewer.setOjectName('table_viewer')
+        
+        layout = QGridLayout()
+        layout.addWidget(self.label, 0, 0, 1, 1)
+        layout.addWidget(self.edit_button, 0, 1, 1, 1)
+        layout.addWidget(self.save_button, 0, 2, 1, 1)
+        layout.addWidget(self.close_button, 0, 3, 1, 1)
+        layout.addWidget(self.text_viewer, 1, 0, 1, 4)
+        
+        self.setLayout(layout)
+        
+        
+    def viewText(self, file):
+        self.file = pjoin(file)
+        self.label.setText(os.path.split(self.file)[1])
+        # if '.json' in self.file:
+        #     pass
+        # elif '.txt' in self.file:
+        #     pass
+        
+        with open(self.file, 'r') as f:
+            self.text_viewer.insertPlainText(f.read())        
+    
+    
+    def edit(self):
+        mode = self.edit_button.text()
+        if mode == 'Edit':
+            reply = QMessageBox.question(self, 'Edit?', 'Are you sure you want to edit?', QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                self.text_viewer.setReadOnly(False)
+                self.edit_button.setText('Stop Editing')
+            else:
+                return
+            
+        elif mode == 'Stop Editing':
+            self.text_viewer.setReadOnly(True)
+            self.edit_button.setText('Edit')
+        else:
+            pass
+    
+    
+    def save(self):
+        with open(self.file, 'w') as yourFile:
+            yourFile.write(str(self.text_viewer.toPlainText()))
+            
+            
+    def close(self):
+        self.parent.updateViewer('default')
+    
+            
+    def clean(self):
+        self.text_viewer.setText('')
+        self.label.setText('')
+        
+
+
+# =============================================================================
+# Default Viewer
+# =============================================================================
+class DefaultViewer(QWidget):
+    """
+    """
+
+
+    def __init__(self, parent):
+        """
+        
+
+        Parameters
+        ----------
+        parent : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
+        super().__init__()
+        self.parent = parent
+        self.bids = self.parent.bids
+        self.threads_pool = self.parent.threads_pool
+        self.setMinimumSize(700,300)
+        
+        self.label = QLabel(self)
+        self.label.setMinimumWidth(500)
+        self.label.setFont(QFont('Calibri', 15))
+        
+        image = QLabel(self)
+        image.setAlignment(Qt.AlignCenter)
+        pixmap = QPixmap(pjoin('Pictures', 'bids_icon.png'))
+        pixmap = pixmap.scaled(700, 500, Qt.KeepAspectRatio)
+        image.setPixmap(pixmap)
+        
+        # # Optional, resize window to image size
+        # self.resize(pixmap.width(),pixmap.height())
+        
+        layout = QVBoxLayout()
+        layout.addWidget(self.label)
+        layout.addWidget(image)
+        
+        self.setLayout(layout)
+        
+    
+    def setLabel(self, text):
+        self.label.setText(os.path.split(pjoin(text))[1])
+        
+    def clean(self):
+        self.label.setText('')
+        
+        
+
+# =============================================================================
+# Default Nifti Viewer
+# =============================================================================
+class DefaultNiftiViewer(QWidget):
+    """
+    """
+
+
+    def __init__(self, parent):
+        """
+        
+
+        Parameters
+        ----------
+        parent : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
+        super().__init__()
+        self.parent = parent
+        self.bids = self.parent.bids
+        self.threads_pool = self.parent.threads_pool
+        self.setMinimumSize(700,300)
+        
+        self.label = QLabel(self)
+        self.label.setMinimumWidth(633)
+        self.label.setFont(QFont('Calibri', 15))
+        
+        self.close_button = QPushButton('Close')
+        self.close_button.setIcon(QIcon(pjoin('Pictures', 'close.png')))
+        self.close_button.adjustSize()
+        self.close_button.clicked.connect(self.close)
+        
+        # Creation of a figure
+        # self.fig = Figure(figsize=(5.5,5.5))
+        self.fig = plt.figure(figsize=(5.5,5.5))
+        
+        self.nifti_canvas = FigureCanvas(self.fig) 
+        
+        # # Optional, resize window to image size
+        # self.resize(pixmap.width(),pixmap.height())
+        
+        layout = QGridLayout()
+        layout.addWidget(self.label, 0, 0, 1, 1)
+        layout.addWidget(self.close_button, 0, 1, 1, 1)
+        layout.addWidget(self.nifti_canvas, 1, 0, 1, 2, Qt.AlignCenter)
+        
+        self.setLayout(layout)
+        
+    
+    def setLabel(self, file):
+        self.label.setText(os.path.split(pjoin(file))[1])
+        
+    
+    def viewNifti(self, nifti):
+        self.setLabel(nifti)
+        mri = nib.load(nifti)
+        mri = mri.get_fdata()
+        mri = np.rot90(mri, axes=(0,1))
+        size = np.shape(mri)
+        if len(size) == 2:
+            # self.fig.figimage(mri, cmap='gray')
+            plt.imshow(mri, cmap='gray', aspect='equal')
+        elif len(size) == 3:
+            if size[2] == 3 or size[2] == 4:
+                # self.fig.figimage(mri)
+                plt.imshow(mri, aspect='equal')
+            else:
+                # self.fig.figimage(mri[:,:,int(2*size[2]/4)], cmap='gray')
+                plt.imshow(mri[:,:,int(2*size[2]/4)], cmap='gray', aspect='equal')
+        elif len(size) == 4:
+            if size[3] == 3 or size[3] == 4:
+                # self.fig.figimage(mri)
+                plt.imshow(mri, aspect='equal')
+            else:
+                # self.fig.figimage(mri[:,:,int(2*size[2]/4),0], cmap='gray')
+                plt.imshow(mri[:,:,int(2*size[2]/4),0], cmap='gray', aspect='equal')
+        else:
+            return
+        self.nifti_canvas.draw()
+        
+    
+    def clean(self):
+        self.label.setText('')
+        self.fig.figimage(None)
+        self.nifti_canvas.draw()
+        
+    
+    def close(self):
+        self.parent.updateViewer('default')
+
+
 # =============================================================================
 # SubprocessWorker
 # =============================================================================
@@ -1779,12 +2867,14 @@ if __name__ == "__main__":
 
     app.exec()
     
-    del config_dict['TQDM_WRITE_STREAM_CONFIG']['queue']
-    del config_dict['TQDM_WRITE_STREAM_CONFIG']['write_stream']
-    del config_dict['TQDM_WRITE_STREAM_CONFIG']['qt_queue_receiver']
-    del config_dict['TQDM_WRITE_STREAM_CONFIG']
-    del config_dict['STDOUT_WRITE_STREAM_CONFIG']['queue']
-    del config_dict['STDOUT_WRITE_STREAM_CONFIG']['write_stream']
-    del config_dict['STDOUT_WRITE_STREAM_CONFIG']['qt_queue_receiver']
-    del config_dict['STDOUT_WRITE_STREAM_CONFIG']
-    del config_dict
+    # del config_dict['TQDM_WRITE_STREAM_CONFIG']['queue']
+    # del config_dict['TQDM_WRITE_STREAM_CONFIG']['write_stream']
+    # del config_dict['TQDM_WRITE_STREAM_CONFIG']['qt_queue_receiver']
+    # del config_dict['TQDM_WRITE_STREAM_CONFIG']
+    # del config_dict['STDOUT_WRITE_STREAM_CONFIG']['queue']
+    # del config_dict['STDOUT_WRITE_STREAM_CONFIG']['write_stream']
+    # del config_dict['STDOUT_WRITE_STREAM_CONFIG']['qt_queue_receiver']
+    # del config_dict['STDOUT_WRITE_STREAM_CONFIG']
+    # del config_dict
+    
+    pass

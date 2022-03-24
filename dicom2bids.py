@@ -19,9 +19,11 @@ import pandas as pd
 from pydicom import dcmread
 import logging
 import sys
+# from nipype.interfaces.dcm2nii import Dcm2niix
+import docker
 
 from tqdm.auto import tqdm
-from my_logging import setup_logging
+# from my_logging import setup_logging
 import time
 
 
@@ -34,7 +36,7 @@ class BIDSHandler:
     """
     
     
-    def __init__(self, root_dir, dicom2niix_path="dcm2niix", logger=None):
+    def __init__(self, root_dir, logger=None):
         """
         
 
@@ -59,7 +61,12 @@ class BIDSHandler:
                                'AX REFORMAT',
                                'Opt_DTI_corr',
                                "COR REFORMAT"]
-        self.dicom2niix_path = dicom2niix_path
+        
+        # self.dcm2niix_converter = Dcm2niix()
+        # self.dcm2niix_converter.inputs.out_filename = "\"%d_%p_%t_%s\""
+        # self.dcm2niix_converter.inputs.compress = 'y'
+        # self.dicom2niix_path = 'dcm2niix'
+        self.client = docker.from_env()
 
         all_directories = [x for x in next(os.walk(root_dir))[1]]
         all_subj_dir = []
@@ -68,7 +75,7 @@ class BIDSHandler:
                 all_subj_dir.append(d)
         self.number_of_subjects = len(all_subj_dir)
         
-        setup_logging('dicom2bids')
+        # setup_logging('dicom2bids')
         self.logger = logging.getLogger('dicom2bids')
         self.logger.setLevel(logging.DEBUG)
         
@@ -271,17 +278,23 @@ class BIDSHandler:
 
         all_sequences = []
         for subdir, dirs, files in os.walk(directory):
-            if len(dirs) !=0 or len(files)< 10:
+            if len(dirs) !=0:#or len(files)< 10:
                 continue
             logging.info(f"SUBDIR: {subdir}\tDIRS: {dirs}")#\nFILES: {files}\n")
             path = os.path.normpath(subdir)
             if convert:
-                subprocess.call([self.dicom2niix_path, '-f', "\"%f_%p_%t_%s\"",
-                                  "-p", "y", "-z", "y", path])
-            for _,_,files in os.walk(path):
-                for file in files:
-                    if '.nii.gz' in file:
-                        all_sequences.append((path, file.replace('.nii.gz', '')))
+                # self.dcm2niix_converter.inputs.source_dir = path
+                # self.dcm2niix_converter.inputs.output_dir = directory
+                # self.dcm2niix_converter.run()
+                # subprocess.call([self.dicom2niix_path, '-f', "\"%d_%p_%t_%s\"",
+                #                   "-p", "y", "-z", "y", '-o', directory, path])
+                subprocess.Popen(f'docker run --rm -v "{path}":/media -v "{directory}":/mnt xnat/dcm2niix dcm2niix -f \"%d_%p_%t_%s\" -p y -z y -o /mnt /media', shell=True).wait()
+                # self.client.containers.run('xnat/dcm2niix', auto_remove=True, volumes={f'{path}':{'bind':'/media', 'mode':'ro'}, f'{directory}':{'bind':'/mnt', 'mode':'rw'}}, command=['dcm2niix -f \"%d_%p_%t_%s\" -p y -z y -o /mnt /media'])
+                
+        for _,_,files in os.walk(directory):
+            for file in files:
+                if '.nii.gz' in file:
+                    all_sequences.append((directory, file.replace('.nii.gz', '')))
         all_sequences = [(x[0].replace('\\', '/'),x[1]) for x in all_sequences]
 
         logging.info("[INFO] Converted dicom files to")
@@ -781,8 +794,8 @@ class BIDSHandler:
                         except ValueError:
                             pass                                
                         bids_filename = bids_filename + f'{field}-{label}_'
-                bids_filename = bids_filename + 'unrecognized_sequence'
-                BIDSHandler.mkdir_if_not_exists(pjoin(self.root_dir, f'sub-{pat_id}', 'unrecognized_sequences'))
+                bids_filename = bids_filename + filename
+                BIDSHandler.mkdir_if_not_exists(pjoin(self.root_dir, f'sub-{pat_id}', f'ses-{session}', 'unrecognized_sequences'))
                 move_all(path, filename, file_extensions, pjoin(self.root_dir, f"sub-{pat_id}", f"ses-{session}", 'unrecognized_sequences'), bids_filename)
                             
                                 
@@ -1147,6 +1160,115 @@ class BIDSHandler:
         return pat_name, pat_date
     
 
+    def update_participants_json(self, new_item):
+        if pexists(pjoin(self.root_dir, "participants.json")):
+            with open(pjoin(self.root_dir, "participants.json")) as part_json:
+                participants_json = json.load(part_json)
+        else:
+            participants_json = {
+                                 "participant_id":{"Description":"Corresponding ID of the participant in the BIDS directory"},
+                                 "age":{"Description": "age of the participant",
+                                        "Units": "years",
+                                        "dicom_tags":["PatientAge"]
+                                        },
+                                 "sex":{"Description": "sex of the participant as reported by the participant",
+                                        "Levels": {"M": "male",
+                                                   "F": "female"
+                                                   },
+                                        "dicom_tags":["PatientSex"]
+                                        }
+                                 }
+        if new_item.get('name') != None and new_item.get('infos') != None:
+            participants_json[new_item.get('name')] = new_item.get('infos')
+        
+        with open(pjoin(self.root_dir, 'participants.json'), 'w') as fp:
+            json.dump(participants_json, fp)
+        
+        self.update_participants_tsv()
+        
+    
+    def update_participants_tsv(self):
+        wrong_extensions = ['.jsn', '.bval', '.bvec', '.nii', '.gz', '.jpg']
+        
+        if pexists(pjoin(self.root_dir, "participants.json")):
+            with open(pjoin(self.root_dir, "participants.json")) as part_json:
+                participants_json = json.load(part_json)
+        else:
+            participants_json = {
+                                 "participant_id":{"Description":"Corresponding ID of the participant in the BIDS directory"},
+                                 "age":{"Description": "age of the participant",
+                                        "Units": "years",
+                                        "dicom_tags":["PatientAge"]
+                                        },
+                                 "sex":{"Description": "sex of the participant as reported by the participant",
+                                        "Levels": {"M": "male",
+                                                   "F": "female"
+                                                   },
+                                        "dicom_tags":["PatientSex"]
+                                        }
+                                 }
+            
+        if pexists(pjoin(self.root_dir, "participants.tsv")):
+            participants_tsv = pd.read_csv(pjoin(self.root_dir, "participants.tsv"), sep='\t').to_dict()
+        else:
+            participants_tsv = {'participant_name':{}, 'participant_id':{}, 'patient_id':{}, 'ses-01':{}}
+            
+        
+        for sub in participants_tsv.get('participant_id').values():
+            last_ses = ''
+            ses = 0
+            for _,dirs,_ in os.walk(pjoin(self.root_dir, sub)):
+                for d in dirs:
+                    if 'ses' in d:
+                        check_ses = int(d.split('-')[1])
+                        if check_ses > ses:
+                            ses = check_ses
+            last_ses = f'ses-{str(ses).zfill(2)}'
+            
+            src = pjoin(self.root_dir, f'sourcedata', sub, last_ses)
+            participants_json_keys = list(participants_json.keys())
+            participants_json_keys.remove('participant_id')
+            tags = [(x, participants_json.get(x).get('dicom_tags')) for x in participants_json_keys]
+            results = [None]*len(tags)
+            tags_bool = [False]*len(tags)
+            for root, dirs, files in os.walk(src):
+                for file in files:
+                    if "." not in file[0] or not any([ext in file for ext in wrong_extensions]):# exclude non-dicoms, good for messy folders
+                        # read the file
+                        ds = dcmread(pjoin(root,file), force=True)
+                        
+                        i = 0
+                        for tag in tags:
+                            dcm_tags = tag[1]
+                            for dcm_tag in dcm_tags:
+                                val = ds.get(dcm_tag)
+                                if val != None:
+                                    results[i] = val
+                                    tags_bool[i] = True
+                                    break
+                            i = i+1
+                    if all(tags_bool):
+                        break
+                if all(tags_bool):
+                    break
+            
+            key_num = list(participants_tsv['participant_id'].values()).index(sub)
+            i = 0
+            for tag in tags:
+                if tag[0] not in participants_tsv.keys():
+                    participants_tsv[tag[0]] = {}
+                # update dicionary with the date of the new session
+                if results[i] != None and results[i] != '':
+                    participants_tsv[tag[0]][key_num] = results[i]
+                else:
+                    participants_tsv[tag[0]][key_num] = 'n/a'
+                i = i+1
+                
+        # Save anonym dic to csv
+        participants_tsv_df = pd.DataFrame(participants_tsv)
+        participants_tsv_df.to_csv(pjoin(self.root_dir, "participants.tsv"), index=False, sep='\t')
+
+
     def anonymisation(self, pat_id, pat_ses, logger=logging):
         """
         
@@ -1170,9 +1292,31 @@ class BIDSHandler:
         
         wrong_extensions = ['.jsn', '.bval', '.bvec', '.nii', '.gz', '.jpg']
         
-        pat_name = None
+        # pat_name = None
         pat_date = None
-        pat_folder_id = None
+        # pat_folder_id = None
+        if pexists(pjoin(self.root_dir, "participants.json")):
+            with open(pjoin(self.root_dir, "participants.json")) as part_json:
+                participants_json = json.load(part_json)
+        else:
+            participants_json = {
+                                 "participant_id":{"Description":"Corresponding ID of the participant in the BIDS directory"},
+                                 "age":{"Description": "age of the participant",
+                                        "Units": "years",
+                                        "dicom_tags":["PatientAge"]
+                                        },
+                                 "sex":{"Description": "sex of the participant as reported by the participant",
+                                        "Levels": {"M": "male",
+                                                   "F": "female"
+                                                   },
+                                        "dicom_tags":["PatientSex"]
+                                        }
+                                 }
+        participants_json_keys = list(participants_json.keys())
+        participants_json_keys.remove('participant_id')
+        tags = [(x, participants_json.get(x).get('dicom_tags')) for x in participants_json_keys]
+        results = [None]*len(tags)
+        tags_bool = [False]*len(tags)
         
         for root, dirs, files in os.walk(src):
             for file in files:
@@ -1180,10 +1324,10 @@ class BIDSHandler:
                     # read the file
                     ds = dcmread(pjoin(root,file), force=True)
 
-                    if pat_name == None:
-                        pat_name = ds.get('PatientName')
-                    if pat_name == None:
-                        pat_name = ds.get('Name')
+            #         if pat_name == None:
+            #             pat_name = ds.get('PatientName')
+            #         if pat_name == None:
+            #             pat_name = ds.get('Name')
                     if pat_date == None:
                         pat_date = ds.get('AcquisitionDateTime')
                     if pat_date == None:
@@ -1194,33 +1338,80 @@ class BIDSHandler:
                         pat_date = ds.get('ContentDate')
                     pat_folder_id = ds.get('PatientID')
                 
-                if pat_name != None and pat_date != None and pat_folder_id != None:
-                    break
+            #     if pat_name != None and pat_date != None and pat_folder_id != None:
+            #         break
             
-            if pat_name != None and pat_date != None and pat_folder_id != None:
+            # if pat_name != None and pat_date != None and pat_folder_id != None:
+            #     break
+                    i = 0
+                    for tag in tags:
+                        dcm_tags = tag[1]
+                        for dcm_tag in dcm_tags:
+                            val = ds.get(dcm_tag)
+                            if val != None:
+                                results[i] = val
+                                tags_bool[i] = True
+                                break
+                        i = i+1
+                if all(tags_bool) and pat_date != None:
+                    break
+            if all(tags_bool) and pat_date != None:
                 break
 
         if pexists(pjoin(self.root_dir, "participants.tsv")):
-            anonym = pd.read_csv(pjoin(self.root_dir, "participants.tsv"), sep='\t').to_dict()
+            participants_tsv = pd.read_csv(pjoin(self.root_dir, "participants.tsv"), sep='\t').to_dict()
         else:
-            anonym = {'participant_name':{}, 'participant_id':{}, 'patient_id':{}, 'ses-01':{}}
+            participants_tsv = {'participant_name':{}, 'participant_id':{}, 'ses-01':{}}
+            
+        if pexists(pjoin(self.root_dir, "participants.json")):
+            with open(pjoin(self.root_dir, "participants.json")) as part_json:
+                participants_json = json.load(part_json)
+        else:
+            participants_json = {
+                                 "participant_id":{"Description":"Corresponding ID of the participant in the BIDS directory"},
+                                 "age":{"Description": "age of the participant",
+                                        "Units": "years"
+                                        },
+                                 "sex":{"Description": "sex of the participant as reported by the participant",
+                                        "Levels": {"M": "male",
+                                                   "F": "female"
+                                                   }
+                                        },
+                                 "ses-01":{"Description":"Date of the MRI session"}
+                                 }
 
-        # check if new patient
-        if f'sub-{pat_id}' in anonym['participant_id'].keys():
-            key_num = list(anonym['participant_id'].values()).index(f'sub-{pat_id}')
-            if f'ses-{pat_ses}' not in anonym.keys():
-                anonym[f'ses-{pat_ses}'] = {}
+        # # check if new patient
+        # if f'sub-{pat_id}' in participants_tsv['participant_id'].keys():
+        #     key_num = list(participants_tsv['participant_id'].values()).index(f'sub-{pat_id}')
+        #     if f'ses-{pat_ses}' not in anonym.keys():
+        #         anonym[f'ses-{pat_ses}'] = {}
+        #     # update dicionary with the date of the new session
+        #     anonym[f'ses-{pat_ses}'][key_num] = pd.Timestamp(pat_date)
+        # else:
+        #     # add new patient
+        #     key_num = len(anonym['participant_id'])
+        #     anonym['participant_name'][key_num] = pat_name
+        #     anonym['participant_id'][key_num] = f'sub-{pat_id}'
+        #     anonym['patient_id'][key_num] = pat_folder_id
+        #     if f'ses-{pat_ses}' not in anonym.keys():   
+        #         anonym[f'ses-{pat_ses}'] = {}
+        #     anonym[f'ses-{pat_ses}'][key_num] = pd.Timestamp(pat_date)
+        
+        if f'sub-{pat_id}' in participants_tsv['participant_id'].keys():
+            key_num = list(participants_tsv['participant_id'].values()).index(f'sub-{pat_id}')
+            if f'ses-{pat_ses}' not in participants_tsv.keys():
+                participants_tsv[f'ses-{pat_ses}'] = {}
             # update dicionary with the date of the new session
-            anonym[f'ses-{pat_ses}'][key_num] = pd.Timestamp(pat_date)
+            participants_tsv[f'ses-{pat_ses}'][key_num] = pd.Timestamp(pat_date)
         else:
             # add new patient
-            key_num = len(anonym['participant_id'])
-            anonym['participant_name'][key_num] = pat_name
-            anonym['participant_id'][key_num] = f'sub-{pat_id}'
-            anonym['patient_id'][key_num] = pat_folder_id
+            key_num = len(participants_tsv['participant_id'])
+            participants_tsv['participant_id'][key_num] = f'sub-{pat_id}'
             if f'ses-{pat_ses}' not in anonym.keys():   
-                anonym[f'ses-{pat_ses}'] = {}
-            anonym[f'ses-{pat_ses}'][key_num] = pd.Timestamp(pat_date)
+                participants_tsv[f'ses-{pat_ses}'] = {}
+            participants_tsv[f'ses-{pat_ses}'][key_num] = pd.Timestamp(pat_date)
+        
+        
             
 
         # Save anonym dic to csv

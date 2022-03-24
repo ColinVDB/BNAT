@@ -57,6 +57,7 @@ import json
 from bids_validator import BIDSValidator
 import time
 import shutil
+import docker
 
 
 # from my_logging import setup_logging
@@ -310,6 +311,7 @@ class FlairStarWorker(QObject):
         self.bids = bids
         self.sub = sub
         self.ses = ses
+        self.client = docker.from_env()
         
         
     def run(self):
@@ -335,8 +337,8 @@ class FlairStarWorker(QObject):
         try:
             logging.info(f'Phase Unwrapping for sub-{self.sub} ses-{self.ses}...')
             
-            # subprocess.Popen('echo Abrico2021 | sudo chmod 666 /var/run/docker.sock')
             subprocess.Popen(f'docker run --rm -v {sub_ses_directory}:/data blakedewey/phase_unwrap -p {phase_wrapped} -o {phase_unwrapped_output}', shell=True).wait()
+            # self.client.containers.run('blakedewey/phase_unwrap', auto_remove=True, volumes=[f'{sub_ses_directory}:/data'], command=f'-p {phase_wrapped} -o {phase_unwrapped_output}')
             
             shutil.move(pjoin(sub_ses_directory, phase_unwrapped), sub_ses_derivative_path)
             
